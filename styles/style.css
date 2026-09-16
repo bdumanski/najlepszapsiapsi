@@ -1,0 +1,1115 @@
+/* ==========================================================================
+   Główny arkusz stylów PsiApsi z widokiem tygodniowym kalendarza
+   ========================================================================== */
+
+:root {
+  color-scheme: light;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 16px;
+  color: #112a46;
+  background: #eef4f8;
+
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-primary-light: #eff6ff;
+  --color-surface: #ffffff;
+  --color-text: #112a46;
+  --color-text-muted: #475569;
+  --color-border: rgba(15, 23, 42, 0.08);
+
+  /* Statusy kalendarza */
+  --status-avail-bg: #f0fdf4;
+  --status-avail-border: #86efac;
+  --status-avail-text: #166534;
+
+  --status-partial-bg: #fefce8;
+  --status-partial-border: #fde047;
+  --status-partial-text: #854d0e;
+
+  --status-full-bg: #fef2f2;
+  --status-full-border: #fca5a5;
+  --status-full-text: #991b1b;
+
+  --status-past-bg: #f1f5f9;
+  --status-past-border: #e2e8f0;
+  --status-past-text: #94a3b8;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: radial-gradient(circle at top left, rgba(37, 99, 235, 0.12), transparent 30%), linear-gradient(180deg, #f8fbff 0%, #eef4f8 100%);
+  color: #112a46;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: #2563eb;
+  color: white;
+  padding: 8px 16px;
+  z-index: 100;
+  text-decoration: none;
+  font-weight: 700;
+  border-radius: 0 0 8px 0;
+  transition: top 0.2s;
+}
+
+.skip-link:focus {
+  top: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.container {
+  width: min(1140px, calc(100% - 2rem));
+  margin: 0 auto;
+}
+
+/* ==========================================================================
+   Header & Nawigacja
+   ========================================================================== */
+
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(17, 42, 70, 0.08);
+}
+
+.header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 0;
+}
+
+.brand {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #0f172a;
+  text-decoration: none;
+  letter-spacing: -0.02em;
+}
+
+.site-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  align-items: center;
+}
+
+.site-nav a,
+.footer-nav a {
+  color: #475569;
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.2s ease;
+}
+
+.site-nav a:hover,
+.site-nav a:focus-visible,
+.footer-nav a:hover,
+.footer-nav a:focus-visible {
+  color: #2563eb;
+}
+
+/* ==========================================================================
+   Przyciski
+   ========================================================================== */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.85rem 1.6rem;
+  border-radius: 999px;
+  border: none;
+  background: #2563eb;
+  color: white;
+  text-decoration: none;
+  font-weight: 700;
+  box-shadow: 0 12px 30px rgba(37, 99, 235, 0.18);
+  transition: transform 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+  cursor: pointer;
+}
+
+.button:hover:not(:disabled),
+.button:focus-visible:not(:disabled) {
+  background: #1d4ed8;
+  transform: translateY(-1px);
+  box-shadow: 0 16px 36px rgba(37, 99, 235, 0.24);
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.button--secondary {
+  background: #0f172a;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.14);
+}
+
+.button--secondary:hover:not(:disabled) {
+  background: #1e293b;
+}
+
+.button--ghost {
+  background: transparent;
+  color: #2563eb;
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.3);
+}
+
+.button--ghost:hover:not(:disabled) {
+  background: rgba(37, 99, 235, 0.06);
+}
+
+/* ==========================================================================
+   Hero Section
+   ========================================================================== */
+
+.hero {
+  padding: clamp(3rem, 6vw, 5rem) 0 4rem;
+}
+
+.hero-grid {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+  gap: 2.5rem;
+  align-items: center;
+}
+
+.hero-copy {
+  max-width: 44rem;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #2563eb;
+  margin-bottom: 1rem;
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: clamp(2.5rem, 4.5vw, 4rem);
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  color: #0f172a;
+}
+
+.hero p {
+  max-width: 38rem;
+  margin: 1.5rem 0 2rem;
+  color: #475569;
+  font-size: 1.1rem;
+  line-height: 1.75;
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.hero-visual {
+  position: relative;
+}
+
+.hero-panel {
+  position: relative;
+  border-radius: 32px;
+  background: linear-gradient(180deg, #ffffff 0%, #e2efff 100%);
+  padding: 2.5rem;
+  min-height: 320px;
+  box-shadow: 0 38px 80px rgba(15, 23, 42, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+}
+
+.hero-panel__label {
+  margin: 0 0 0.75rem;
+  color: #2563eb;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.hero-panel h2 {
+  margin: 0;
+  font-size: 2rem;
+  color: #0f172a;
+}
+
+.hero-panel p {
+  color: #475569;
+  margin: 1rem 0 0;
+  line-height: 1.8;
+}
+
+/* ==========================================================================
+   Usługi
+   ========================================================================== */
+
+.services {
+  padding: 4rem 0 2rem;
+}
+
+.section-header {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 2.5rem;
+}
+
+.section-header h2 {
+  margin: 0;
+  font-size: clamp(2rem, 3vw, 2.75rem);
+  color: #0f172a;
+  letter-spacing: -0.02em;
+}
+
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.5rem;
+}
+
+.card {
+  padding: 2rem;
+  border-radius: 28px;
+  background: white;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 26px 50px rgba(15, 23, 42, 0.04);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 32px 60px rgba(15, 23, 42, 0.08);
+}
+
+.card h3 {
+  margin-top: 0;
+  font-size: 1.35rem;
+  color: #0f172a;
+}
+
+.card p {
+  color: #475569;
+  margin: 1rem 0 1.5rem;
+  line-height: 1.75;
+}
+
+.card-link {
+  color: #2563eb;
+  text-decoration: none;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.card-link:hover {
+  text-decoration: underline;
+}
+
+/* ==========================================================================
+   Statystyki
+   ========================================================================== */
+
+.stats {
+  padding: 3rem 0;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1.5rem;
+  background: white;
+  border-radius: 32px;
+  padding: 2.5rem;
+  box-shadow: 0 30px 60px rgba(15, 23, 42, 0.06);
+  border: 1px solid rgba(15, 23, 42, 0.04);
+}
+
+.stat {
+  text-align: center;
+  padding: 0.5rem;
+}
+
+.stat-value {
+  margin: 0;
+  font-size: 2.75rem;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.03em;
+}
+
+.stat-label {
+  margin: 0.5rem 0 0;
+  color: #475569;
+  font-weight: 500;
+}
+
+/* ==========================================================================
+   O nas & CTA
+   ========================================================================== */
+
+.about {
+  padding: 3rem 0;
+}
+
+.about-grid {
+  display: grid;
+  gap: 2rem;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+  align-items: center;
+}
+
+.about-card {
+  padding: 2.25rem;
+  border-radius: 28px;
+  background: #2563eb;
+  color: white;
+  box-shadow: 0 28px 60px rgba(37, 99, 235, 0.16);
+}
+
+.about-card__label {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.9;
+  font-weight: 700;
+}
+
+.about h2,
+.cta h2,
+.section-header h2 {
+  line-height: 1.1;
+}
+
+.about p {
+  color: #475569;
+  margin: 1.4rem 0 0;
+  line-height: 1.8;
+}
+
+.cta {
+  padding: 3rem 0 4rem;
+}
+
+.cta-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  align-items: center;
+  justify-content: space-between;
+  background: #ffffff;
+  border-radius: 32px;
+  padding: 2.5rem;
+  box-shadow: 0 22px 50px rgba(15, 23, 42, 0.08);
+  border: 1px solid rgba(15, 23, 42, 0.04);
+}
+
+.cta-panel h2 {
+  margin: 0;
+  font-size: clamp(1.75rem, 2.5vw, 2.5rem);
+}
+
+/* ==========================================================================
+   Lokalizacja / Mapa
+   ========================================================================== */
+
+.location-map {
+  padding: 2rem 0 3rem;
+}
+
+.map-card {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 2rem;
+  background: white;
+  border-radius: 28px;
+  padding: 2rem;
+  box-shadow: 0 26px 50px rgba(15, 23, 42, 0.04);
+  align-items: center;
+}
+
+.map-card__content h2 {
+  margin: 0.75rem 0 0.85rem;
+  font-size: 1.8rem;
+  color: #0f172a;
+}
+
+.map-card__content p {
+  margin: 0;
+  color: #475569;
+  line-height: 1.8;
+}
+
+.map-placeholder {
+  min-height: 240px;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+}
+
+.map-placeholder iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
+/* ==========================================================================
+   TYGODNIOWY KALENDARZ REZERWACJI
+   ========================================================================== */
+
+.booking {
+  padding: 3rem 0 5rem;
+}
+
+.week-calendar-container {
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: 24px;
+  padding: 1.75rem;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.05);
+}
+
+.week-calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.week-title-wrap {
+  text-align: center;
+  flex: 1 1 240px;
+}
+
+.week-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  margin: 0;
+  color: #0f172a;
+}
+
+.calendar-subtitle {
+  display: block;
+  font-size: 0.875rem;
+  color: #64748b;
+  margin-top: 0.3rem;
+}
+
+/* Przyciski zmiany tygodnia */
+.calendar-nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.65rem 1.2rem;
+  border-radius: 999px;
+  border: 1px solid rgba(37, 99, 235, 0.25);
+  background: #ffffff;
+  color: #2563eb;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.calendar-nav:hover:not(:disabled) {
+  background: #2563eb;
+  color: #ffffff;
+  border-color: #2563eb;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+}
+
+.calendar-nav:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  border-color: #cbd5e1;
+  color: #94a3b8;
+  background: #f8fafc;
+}
+
+/* Legenda statusów */
+.week-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 1.5rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.85rem 1rem;
+  margin-bottom: 1.25rem;
+  background: #f8fafc;
+  border-radius: 14px;
+  font-size: 0.825rem;
+  color: #475569;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.legend-dot.available {
+  background: #86efac;
+  border: 1px solid #166534;
+}
+
+.legend-dot.partial {
+  background: #fde047;
+  border: 1px solid #854d0e;
+}
+
+.legend-dot.full {
+  background: #fca5a5;
+  border: 1px solid #991b1b;
+}
+
+.legend-dot.past {
+  background: #cbd5e1;
+  border: 1px solid #94a3b8;
+}
+
+/* Elementy nawigacji mobilnej (ukryte domyślnie na komputerach) */
+.mobile-day-picker,
+.mobile-day-nav {
+  display: none;
+}
+
+/* Siatka kalendarza tygodniowego */
+.week-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.65rem;
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  .week-grid {
+    grid-template-columns: repeat(7, minmax(105px, 1fr));
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+.week-day-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 0.25rem;
+}
+
+.week-day-col.is-today .week-day-header {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+}
+
+.week-day-col.is-today .week-day-header strong {
+  color: #2563eb;
+}
+
+.week-day-header {
+  text-align: center;
+  padding: 0.65rem 0.5rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.875rem;
+}
+
+.week-day-header strong {
+  color: #1e293b;
+  font-size: 0.95rem;
+}
+
+.week-day-header span {
+  color: #64748b;
+  font-size: 0.8rem;
+}
+
+/* Karty slotów godzinowych */
+.slot-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0.85rem 0.4rem;
+  border-radius: 12px;
+  border: 1px solid #cbd5e1;
+  background-color: #ffffff;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  font-family: inherit;
+  width: 100%;
+  min-height: 68px;
+  position: relative;
+}
+
+.slot-time {
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.slot-status {
+  font-size: 0.725rem;
+  margin-top: 0.35rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* Stany slotów */
+.slot-card.available {
+  background-color: var(--status-avail-bg);
+  border-color: var(--status-avail-border);
+  color: var(--status-avail-text);
+}
+
+.slot-card.available:hover {
+  border-color: #22c55e;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(34, 197, 94, 0.18);
+}
+
+.slot-card.partial {
+  background-color: var(--status-partial-bg);
+  border-color: var(--status-partial-border);
+  color: var(--status-partial-text);
+}
+
+.slot-card.partial:hover {
+  border-color: #eab308;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(234, 179, 8, 0.18);
+}
+
+.slot-card.full {
+  background-color: var(--status-full-bg);
+  border-color: var(--status-full-border);
+  color: var(--status-full-text);
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
+.slot-card.past {
+  background-color: var(--status-past-bg);
+  border-color: var(--status-past-border);
+  color: var(--status-past-text);
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.slot-card.selected {
+  outline: 3px solid #2563eb;
+  border-color: #2563eb;
+  background-color: #ffffff;
+  color: #1d4ed8;
+  font-weight: bold;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.18);
+  transform: translateY(-1px);
+}
+
+/* ==========================================================================
+   Formularz zgłoszeniowy & Panel podsumowania
+   ========================================================================== */
+
+.booking-panel {
+  margin-top: 2rem;
+}
+
+.booking-summary {
+  background: #ffffff;
+  border-radius: 28px;
+  padding: 2.25rem;
+  box-shadow: 0 26px 50px rgba(15, 23, 42, 0.04);
+  border: 1px solid var(--color-border);
+}
+
+.booking-summary h3 {
+  margin: 0.5rem 0 0.25rem;
+  font-size: 1.5rem;
+  color: #0f172a;
+}
+
+.booking-summary p {
+  margin: 0;
+  color: #475569;
+  line-height: 1.6;
+}
+
+.booking-form {
+  margin-top: 1.75rem;
+}
+
+.form-grid-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem 1.5rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.form-group label {
+  font-weight: 600;
+  color: #1e293b;
+  font-size: 0.9rem;
+}
+
+.form-group input,
+.form-group select {
+  width: 100%;
+  padding: 0.85rem 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #0f172a;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  box-sizing: border-box;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: #2563eb;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.form-group input:disabled,
+.form-group select:disabled {
+  opacity: 0.7;
+  background: #f1f5f9;
+  cursor: not-allowed;
+}
+
+.form-group .field-hint {
+  font-size: 0.775rem;
+  color: #64748b;
+  margin-top: 0.2rem;
+}
+
+/* ==========================================================================
+   Stopka
+   ========================================================================== */
+
+.site-footer {
+  padding: 3rem 0 4rem;
+  border-top: 1px solid rgba(17, 42, 70, 0.08);
+  background: #ffffff;
+}
+
+.footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  justify-content: space-between;
+  align-items: center;
+  color: #475569;
+}
+
+.footer-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+}
+
+/* ==========================================================================
+   Responsywność (Media Queries)
+   ========================================================================== */
+
+@media (max-width: 860px) {
+  .hero-grid,
+  .about-grid,
+  .map-card {
+    grid-template-columns: 1fr;
+  }
+
+  .header-inner {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+  }
+
+  .site-nav {
+    justify-content: center;
+  }
+
+  .booking-summary {
+    padding: 1.5rem;
+  }
+}
+
+@media (max-width: 768px) {
+  /* Kontenery i nagłówek kalendarza */
+  .week-calendar-container {
+    padding: 1rem;
+    border-radius: 18px;
+  }
+
+  .week-calendar-header {
+    flex-direction: column;
+    text-align: center;
+    gap: 0.75rem;
+  }
+
+  .week-calendar-header .calendar-nav {
+    width: 100%;
+    padding: 0.65rem 1rem;
+  }
+
+  .week-title {
+    font-size: 1.15rem;
+  }
+
+  .calendar-subtitle {
+    font-size: 0.8rem;
+  }
+
+  .week-legend {
+    justify-content: flex-start;
+    padding: 0.65rem 0.85rem;
+    font-size: 0.75rem;
+    gap: 0.5rem 1rem;
+  }
+
+  /* Pasek wyboru dnia tygodnia na telefonie */
+  .mobile-day-picker {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.25rem;
+    margin-bottom: 0.75rem;
+    background: #f8fafc;
+    padding: 0.35rem;
+    border-radius: 14px;
+    border: 1px solid #e2e8f0;
+  }
+
+  .mobile-day-pill {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0.45rem 0.15rem;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    background: #ffffff;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s ease;
+    text-align: center;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  }
+
+  .mobile-day-pill .pill-name {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    line-height: 1;
+  }
+
+  .mobile-day-pill .pill-num {
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.2;
+    margin: 0.2rem 0;
+  }
+
+  .mobile-day-pill .pill-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    display: block;
+  }
+
+  .mobile-day-pill.active {
+    background: #2563eb;
+    color: #ffffff;
+    border-color: #2563eb;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+  }
+
+  .mobile-day-pill.active .pill-name,
+  .mobile-day-pill.active .pill-num {
+    color: #ffffff;
+  }
+
+  .mobile-day-pill.active .pill-dot {
+    background-color: #ffffff !important;
+  }
+
+  .mobile-day-pill.is-today:not(.active) {
+    border-color: #93c5fd;
+    background: #eff6ff;
+  }
+
+  .mobile-day-pill.is-today:not(.active) .pill-name {
+    color: #2563eb;
+  }
+
+  /* Pasek szybkiej nawigacji dnia */
+  .mobile-day-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.85rem;
+    padding: 0.5rem 0.75rem;
+    background: #eff6ff;
+    border-radius: 12px;
+    border: 1px solid #bfdbfe;
+  }
+
+  .mobile-day-nav-btn {
+    background: #ffffff;
+    border: 1px solid #93c5fd;
+    color: #2563eb;
+    font-size: 1.2rem;
+    font-weight: bold;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    line-height: 1;
+    transition: background-color 0.2s ease;
+  }
+
+  .mobile-day-nav-btn:active {
+    background: #dbeafe;
+  }
+
+  .mobile-day-nav-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #1e3a8a;
+    text-align: center;
+  }
+
+  /* Widok siatki na telefonie: tylko 1 wybrany dzień */
+  .week-grid {
+    display: block !important;
+    overflow-x: visible;
+    padding-bottom: 0;
+  }
+
+  .week-day-col:not(.is-mobile-active) {
+    display: none !important;
+  }
+
+  .week-day-col.is-mobile-active {
+    display: flex !important;
+    flex-direction: column;
+    gap: 0.75rem;
+    width: 100%;
+  }
+
+  .week-day-col.is-mobile-active .week-day-header {
+    display: none;
+  }
+
+  /* Karty slotów w widoku mobilnym: wygodne poziome banery */
+  .slot-card {
+    min-height: 68px;
+    padding: 1rem 1.25rem;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    border-radius: 14px;
+    width: 100%;
+  }
+
+  .slot-time {
+    font-size: 1.25rem;
+    font-weight: 800;
+  }
+
+  .slot-status {
+    font-size: 0.85rem;
+    margin-top: 0;
+    text-align: right;
+  }
+
+  /* Formularz */
+  .form-grid-2col {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .booking-summary {
+    padding: 1.25rem;
+  }
+
+  .hero h1 {
+    font-size: 2.25rem;
+  }
+
+  .hero-actions {
+    flex-direction: column;
+  }
+}

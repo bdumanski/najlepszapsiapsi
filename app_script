@@ -1,0 +1,233 @@
+function doPost(e) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: 'Serwer był zajęty. Spróbuj ponownie.' }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  try {
+    var data = JSON.parse(e.postData.contents);
+    var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = spreadsheet.getActiveSheet();
+    var tz = spreadsheet.getSpreadsheetTimeZone() || "Europe/Warsaw";
+    var allRows = sheet.getDataRange().getValues();
+
+    var requestedDate = String(data.rawDate).trim();
+    var requestedTime = normalizeTime(String(data.timeSlot).trim());
+    var requestedService = String(data.serviceType || '').toLowerCase();
+
+    // Sprawdzamy czy żądanie to zajęcia indywidualne (1-1 / konsultacja)
+    var is1on1 = requestedService.indexOf('1-1') !== -1 || 
+                 requestedService.indexOf('indywidualny') !== -1 || 
+                 requestedService.indexOf('konsultacj') !== -1;
+
+    var existing1on1 = false;
+    var existingGroupCount = 0;
+    var existingTotal = 0;
+
+    for (var i = 1; i < allRows.length; i++) {
+      var row = allRows[i];
+      var rowDate = formatSheetDate(row[0], tz);
+      var rowTime = formatSheetTime(row[2], tz);
+
+      if (rowDate === requestedDate && rowTime === requestedTime) {
+        existingTotal++;
+        var rowService = String(row[3] || '').toLowerCase();
+        if (rowService.indexOf('1-1') !== -1 || 
+            rowService.indexOf('indywidualny') !== -1 || 
+            rowService.indexOf('konsultacj') !== -1) {
+          existing1on1 = true;
+        } else {
+          existingGroupCount++;
+        }
+      }
+    }
+
+    // 1. Jeśli w tym slocie jest już rezerwacja 1-1 / konsultacja -> brak miejsc
+    if (existing1on1) {
+      lock.releaseLock();
+      return ContentService.createTextOutput(JSON.stringify({
+        status: 'conflict',
+        message: 'Termin ' + requestedDate + ' o godz. ' + requestedTime + ' jest już zajęty (zajęcia indywidualne)!'
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 2. Jeśli klient chce zajęcia 1-1, a są już zapisane inne psy -> konflikt
+    if (is1on1 && existingTotal > 0) {
+      lock.releaseLock();
+      return ContentService.createTextOutput(JSON.stringify({
+        status: 'conflict',
+        message: 'W wybranym terminie (' + requestedTime + ') trwają już inne zajęcia grupowe. Nie można zarezerwować zajęć 1-1 w tym slocie.'
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 3. Jeśli to spacer grupowy, limit to 3 psy
+    if (!is1on1 && existingGroupCount >= 3) {
+      lock.releaseLock();
+      return ContentService.createTextOutput(JSON.stringify({
+        status: 'conflict',
+        message: 'Brak wolnych miejsc na spacer grupowy w tym terminie (limit 3 psów został osiągnięty)!'
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // Zapisujemy rezerwację z prefiksem apostrofu, aby Google Sheets nie zniekształcał formatu tekstu
+    sheet.appendRow([
+      "'" + requestedDate,
+      data.dateDisplay,
+      "'" + requestedTime,
+      data.serviceType,
+      data.location,
+      data.firstName,
+      data.lastName,
+      data.clientEmail,
+      data.dogName,
+      data.dogAge,
+      data.dogGender,
+      Utilities.formatDate(new Date(), tz, "yyyy-MM-dd HH:mm:ss")
+    ]);
+
+    // 1. Tworzenie wydarzenia w Kalendarzu Google
+    try {
+      var dateParts = String(data.rawDate).trim().split('-');
+      var year = parseInt(dateParts[0], 10);
+      var month = parseInt(dateParts[1], 10) - 1; // Miesiące w JS Date są 0-indexed
+      var day = parseInt(dateParts[2], 10);
+
+      var timeParts = normalizeTime(String(data.timeSlot).trim()).split(':');
+      var startHour = parseInt(timeParts[0], 10);
+      var startMinute = parseInt(timeParts[1], 10);
+
+      var startTime = new Date(year, month, day, startHour, startMinute, 0);
+      var endTime = new Date(startTime.getTime() + 60 * 60 * 1000); // 1 godzina trwania zajęć
+
+      var eventLocation = (data.location === 'Inna' ? data.otherLocation : data.location) || 'Warszawa Wawer';
+      var eventTitle = 'PsiApsi: ' + data.serviceType + ' – ' + data.firstName + ' ' + data.lastName + ' (' + data.dogName + ')';
+      
+      var eventDescription = '🐶 Rezerwacja zajęć PsiApsi\n\n' +
+                             '👤 Klient: ' + data.firstName + ' ' + data.lastName + '\n' +
+                             '📧 E-mail: ' + (data.clientEmail || 'Brak') + '\n' +
+                             '🐕 Pies: ' + data.dogName + ' (' + data.dogAge + ' lat, płeć: ' + data.dogGender + ')\n' +
+                             '🎯 Rodzaj zajęć: ' + data.serviceType + '\n' +
+                             '📍 Lokalizacja: ' + eventLocation + '\n' +
+                             '📅 Data i godzina: ' + data.dateDisplay + ' o godz. ' + data.timeSlot;
+
+      var calendar = CalendarApp.getDefaultCalendar();
+      if (calendar) {
+        try {
+          var eventOptions = {
+            description: eventDescription,
+            location: eventLocation
+          };
+          if (data.clientEmail && String(data.clientEmail).indexOf('@') !== -1) {
+            eventOptions.guests = String(data.clientEmail).trim();
+            eventOptions.sendInvites = true;
+          }
+          calendar.createEvent(eventTitle, startTime, endTime, eventOptions);
+        } catch (inviteErr) {
+          // Fallback: jeśli wysyłka zaproszenia gościa rzuci błąd, tworzymy wydarzenie w kalendarzu bez parametru guests
+          calendar.createEvent(eventTitle, startTime, endTime, {
+            description: eventDescription,
+            location: eventLocation
+          });
+        }
+      }
+    } catch (calErr) {
+      Logger.log("Błąd tworzenia wydarzenia w Google Calendar: " + calErr);
+    }
+
+    // 2. Opcjonalny e-mail potwierdzający do klienta
+    try {
+      if (data.clientEmail) {
+        MailApp.sendEmail({
+          to: data.clientEmail,
+          subject: 'Potwierdzenie rezerwacji - PsiApsi',
+          body: 'Cześć ' + data.firstName + '!\n\nTwoja rezerwacja na dzień ' + data.dateDisplay + ' o godz. ' + data.timeSlot + ' (' + data.serviceType + ') została przyjęta.\n\nPozdrawiamy,\nZespół PsiApsi'
+        });
+      }
+    } catch (emailErr) {
+      Logger.log("Błąd e-mail: " + emailErr);
+    }
+
+    lock.releaseLock();
+    return ContentService.createTextOutput(JSON.stringify({ status: 'success' }))
+      .setMimeType(ContentService.MimeType.JSON);
+
+  } catch (error) {
+    lock.releaseLock();
+    return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: error.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function doGet(e) {
+  try {
+    var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = spreadsheet.getActiveSheet();
+    var tz = spreadsheet.getSpreadsheetTimeZone() || "Europe/Warsaw";
+    var data = sheet.getDataRange().getValues();
+
+    var bookedSlots = [];
+    for (var i = 1; i < data.length; i++) {
+      var row = data[i];
+      var rowDate = formatSheetDate(row[0], tz);
+      var rowTime = formatSheetTime(row[2], tz);
+      var serviceType = String(row[3] || '').trim();
+
+      if (rowDate && rowTime) {
+        bookedSlots.push({
+          date: rowDate,
+          timeSlot: rowTime,
+          serviceType: serviceType
+        });
+      }
+    }
+
+    return ContentService.createTextOutput(JSON.stringify({ status: 'success', bookedSlots: bookedSlots }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// Bezpieczne formatowanie daty z arkusza (obsługuje Date, ciągi ISO oraz sformatowane teksty)
+function formatSheetDate(val, tz) {
+  if (!val) return '';
+  if (val instanceof Date || (typeof val === 'object' && typeof val.getTime === 'function')) {
+    return Utilities.formatDate(val, tz, "yyyy-MM-dd");
+  }
+  var str = String(val).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    return str;
+  }
+  var parsed = new Date(str);
+  if (!isNaN(parsed.getTime())) {
+    return Utilities.formatDate(parsed, tz, "yyyy-MM-dd");
+  }
+  return str;
+}
+
+// Bezpieczne formatowanie godziny z arkusza (obsługuje obiekty daty z 1899 r., "18:00", itp.)
+function formatSheetTime(val, tz) {
+  if (!val) return '';
+  if (val instanceof Date || (typeof val === 'object' && typeof val.getHours === 'function')) {
+    return Utilities.formatDate(val, tz, "HH:mm");
+  }
+  var str = String(val).trim();
+  return normalizeTime(str);
+}
+
+function normalizeTime(str) {
+  if (!str) return '';
+  if (/^\d{1,2}:\d{2}$/.test(str)) {
+    return str.length === 4 ? '0' + str : str;
+  }
+  var match = str.match(/(\d{1,2}):(\d{2})(?::\d{2})?/);
+  if (match) {
+    var h = match[1].length === 1 ? '0' + match[1] : match[1];
+    return h + ':' + match[2];
+  }
+  return str;
+}

@@ -1,0 +1,29 @@
+[
+  {
+    "id": 1,
+    "title": "Podstawy posłuszeństwa",
+    "date": "2026-10-03",
+    "time": "10:00",
+    "place": "Park Centralny",
+    "type": "Podstawy",
+    "spots": 12
+  },
+  {
+    "id": 2,
+    "title": "Socjalizacja dla szczeniąt",
+    "date": "2026-10-10",
+    "time": "11:30",
+    "place": "Boisko",
+    "type": "Socjalizacja",
+    "spots": 10
+  },
+  {
+    "id": 3,
+    "title": "Zabawy i aktywność",
+    "date": "2026-10-17",
+    "time": "09:30",
+    "place": "Park Centralny",
+    "type": "Zabawy i aktywność",
+    "spots": 8
+  }
+]
