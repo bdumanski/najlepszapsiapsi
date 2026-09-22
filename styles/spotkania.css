@@ -1,0 +1,703 @@
+/* ==========================================================
+   PsiApsi — Strona rezerwacji (spotkania.css)
+   Minimal, single-column, Wod Guru-inspired
+   ========================================================== */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --brand:      #1B6B50;
+  --brand-dark: #134f3b;
+  --brand-soft: #e8f4ef;
+  --accent:     #D97706;
+  --danger:     #9CA3AF;
+  --text:       #111827;
+  --text-muted: #6B7280;
+  --border:     #E5E7EB;
+  --bg:         #FAFAFA;
+  --white:      #FFFFFF;
+  --radius:     12px;
+  --radius-sm:  8px;
+  --shadow:     0 1px 3px rgba(0,0,0,.08), 0 4px 16px rgba(0,0,0,.04);
+  --shadow-md:  0 4px 24px rgba(0,0,0,.10);
+  --font:       'Inter', system-ui, -apple-system, sans-serif;
+}
+
+html { font-size: 16px; scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Header ───────────────────────────────────────────────── */
+
+.s-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--white);
+  border-bottom: 1px solid var(--border);
+}
+
+.s-header-inner {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 0 1.25rem;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* ── Logo Styles ──────────────────────────────────────────── */
+
+.s-logo {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  text-decoration: none;
+  color: var(--text);
+}
+
+.s-logo-icon { 
+  font-size: 1.5rem; 
+  line-height: 1;
+}
+
+.s-logo-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.s-logo-name {
+  font-family: 'Outfit', cursive, sans-serif !important;
+  font-weight: 600;
+  font-size: 1.25rem;
+  letter-spacing: -.01em;
+  color: var(--text);
+}
+
+.s-logo-sub {
+  font-family: 'Caveat', cursive; /* Zakręcona czcionka */
+  font-size: 1.1rem;
+  color: var(--brand); /* Zastosowanie koloru marki (#1B6B50) */
+  margin-top: -2px;
+  transform: rotate(-2deg); /* Delikatny, odręczny przechył */
+  display: inline-block;
+}
+
+.s-back-link {
+  font-size: .85rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color .15s;
+}
+.s-back-link:hover { color: var(--brand); }
+
+/* ── Main layout ──────────────────────────────────────────── */
+
+.s-main { padding: 2.5rem 1.25rem 5rem; }
+
+.s-page {
+  max-width: 680px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+}
+
+/* ── Page title ───────────────────────────────────────────── */
+
+.s-page-title h1 {
+  font-size: 1.9rem;
+  font-weight: 600;
+  letter-spacing: -.03em;
+  line-height: 1.2;
+  margin-bottom: .4rem;
+}
+.s-page-title p {
+  color: var(--text-muted);
+  font-size: .95rem;
+  line-height: 1.5;
+}
+
+/* ── Step container ───────────────────────────────────────── */
+
+.s-step {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.75rem;
+  box-shadow: var(--shadow);
+  transition: opacity .25s, transform .25s;
+}
+
+.s-step--hidden {
+  display: none;
+}
+
+.s-step-label {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  font-size: .78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--text-muted);
+  margin-bottom: 1.25rem;
+}
+
+.s-step-num {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--brand);
+  color: #fff;
+  font-size: .7rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* ── Service buttons (Step 1) ─────────────────────────────── */
+
+.s-service-row {
+  display: flex;
+  gap: .75rem;
+  flex-wrap: wrap;
+}
+
+.s-service-btn {
+  flex: 1;
+  min-width: 140px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: .3rem;
+  padding: 1rem 1.1rem;
+  background: var(--bg);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color .15s, background .15s, box-shadow .15s;
+}
+
+.s-service-btn:hover {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.s-service-btn.active {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+  box-shadow: 0 0 0 3px rgba(27,107,80,.12);
+}
+
+.s-service-icon { font-size: 1.4rem; }
+
+.s-service-name {
+  font-size: .9rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.s-service-desc {
+  font-size: .78rem;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
+/* ── Week nav (Step 2) ────────────────────────────────────── */
+
+.s-week-nav {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  margin-bottom: 1rem;
+}
+
+.s-week-arrow {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--white);
+  color: var(--text);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s, border-color .15s;
+}
+.s-week-arrow:hover { background: var(--brand-soft); border-color: var(--brand); }
+.s-week-arrow:disabled { opacity: .35; cursor: default; }
+
+.s-week-label {
+  flex: 1;
+  text-align: center;
+  font-size: .9rem;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.s-today-btn {
+  font-size: .78rem;
+  font-weight: 500;
+  padding: .3rem .75rem;
+  border-radius: 20px;
+  border: 1px solid var(--brand);
+  background: transparent;
+  color: var(--brand);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .15s, color .15s;
+}
+.s-today-btn:hover { background: var(--brand); color: #fff; }
+
+/* ── Days strip ───────────────────────────────────────────── */
+
+.s-days-strip {
+  display: flex;
+  gap: .4rem;
+  margin-bottom: 1.25rem;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+.s-days-strip::-webkit-scrollbar { display: none; }
+
+/* Day pill button (rendered by JS as .s-day-pill) */
+.s-day-pill {
+  flex: 1;
+  min-width: 52px;
+  max-width: 80px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .25rem;
+  padding: .55rem .3rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+  font-family: var(--font);
+}
+
+.s-day-pill:hover { background: var(--brand-soft); border-color: var(--brand); }
+
+.s-day-pill.active {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+}
+
+.s-day-pill.is-today .s-day-name { color: var(--brand); font-weight: 700; }
+.s-day-pill.active.is-today .s-day-name { color: #fff; }
+
+.s-day-name { font-size: .7rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
+.s-day-num  { font-size: 1rem; font-weight: 500; }
+.s-day-dot  { width: 6px; height: 6px; border-radius: 50%; background: var(--danger); flex-shrink: 0; }
+
+/* ── Mobile banner ────────────────────────────────────────── */
+
+.s-mobile-banner {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--brand-soft);
+  border-radius: var(--radius-sm);
+  padding: .6rem 1rem;
+  margin-bottom: 1rem;
+  font-weight: 500;
+  font-size: .9rem;
+  color: var(--brand-dark);
+}
+
+.s-mobile-arrow {
+  background: none;
+  border: none;
+  font-size: 1.3rem;
+  color: var(--brand);
+  cursor: pointer;
+  padding: 0 .4rem;
+  line-height: 1;
+}
+
+/* ── Slots grid (day columns) ─────────────────────────────── */
+
+.s-slots-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: .5rem;
+  margin-bottom: 1rem;
+}
+
+/* Day column */
+.s-day-col {
+  display: flex;
+  flex-direction: column;
+  gap: .4rem;
+}
+
+/* On mobile only 1 column is shown */
+.s-day-col { display: none; }
+.s-day-col.is-mobile-active { display: flex; }
+
+/* Desktop: show all */
+@media (min-width: 560px) {
+  .s-day-col { display: flex; }
+}
+
+.s-day-col-header {
+  text-align: center;
+  padding-bottom: .4rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: .1rem;
+}
+.s-day-col-name { display: block; font-size: .65rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); }
+.s-day-col-num  { display: block; font-size: 1rem; font-weight: 600; color: var(--text); }
+
+.s-day-col.is-today .s-day-col-num {
+  color: var(--brand);
+}
+
+/* Slot button */
+.s-slot-btn {
+  width: 100%;
+  padding: .55rem .4rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  font-family: var(--font);
+  font-size: .78rem;
+  font-weight: 500;
+  text-align: center;
+  cursor: pointer;
+  transition: all .15s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .15rem;
+}
+
+.s-slot-time   { font-size: .9rem; font-weight: 600; }
+.s-slot-status { font-size: .65rem; font-weight: 400; line-height: 1.2; }
+
+/* Slot states */
+.s-slot-btn.is-available {
+  background: var(--brand-soft);
+  border-color: rgba(27,107,80,.2);
+  color: var(--brand-dark);
+}
+.s-slot-btn.is-available:hover {
+  background: var(--brand);
+  color: #fff;
+  border-color: var(--brand);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(27,107,80,.25);
+}
+
+.s-slot-btn.is-partial {
+  background: #FEF3C7;
+  border-color: rgba(217,119,6,.25);
+  color: #92400E;
+}
+.s-slot-btn.is-partial:hover {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.s-slot-btn.is-full {
+  background: #F9FAFB;
+  border-color: var(--border);
+  color: var(--danger);
+  cursor: not-allowed;
+}
+
+.s-slot-btn.is-past {
+  background: transparent;
+  border-color: transparent;
+  color: #D1D5DB;
+  cursor: not-allowed;
+}
+
+.s-slot-btn.is-selected {
+  background: var(--brand) !important;
+  border-color: var(--brand) !important;
+  color: #fff !important;
+  box-shadow: 0 3px 12px rgba(27,107,80,.3);
+}
+
+/* ── Legend ───────────────────────────────────────────────── */
+
+.s-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem;
+  margin-top: .25rem;
+}
+
+.s-legend-item {
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+  font-size: .75rem;
+  color: var(--text-muted);
+}
+
+.s-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.s-dot.free    { background: var(--brand); }
+.s-dot.partial { background: var(--accent); }
+.s-dot.busy    { background: var(--danger); }
+
+/* ── Selected summary bar (Step 3) ───────────────────────── */
+
+.s-selected-summary {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  background: var(--brand-soft);
+  border-radius: var(--radius-sm);
+  padding: .85rem 1rem;
+  margin-bottom: 1.5rem;
+  font-size: .9rem;
+  font-weight: 500;
+  color: var(--brand-dark);
+}
+
+.s-summary-icon { font-size: 1.1rem; flex-shrink: 0; }
+
+#selectedSummaryText { flex: 1; }
+
+.s-change-btn {
+  font-size: .78rem;
+  font-weight: 500;
+  color: var(--brand);
+  background: none;
+  border: 1px solid var(--brand);
+  border-radius: 20px;
+  padding: .25rem .65rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .15s, color .15s;
+}
+.s-change-btn:hover { background: var(--brand); color: #fff; }
+
+/* ── Form grid ────────────────────────────────────────────── */
+
+.s-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.s-field { display: flex; flex-direction: column; gap: .35rem; }
+.s-field--full { grid-column: 1 / -1; }
+.s-field--hidden { display: none; }
+
+.s-field label {
+  font-size: .78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.s-field input,
+.s-field select {
+  width: 100%;
+  padding: .7rem .9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font);
+  font-size: .95rem;
+  color: var(--text);
+  background: var(--white);
+  transition: border-color .15s, box-shadow .15s;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.s-field input:focus,
+.s-field select:focus {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(27,107,80,.1);
+}
+
+.s-field-hint {
+  font-size: .75rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* Gender toggle */
+.s-gender-row {
+  display: flex;
+  gap: .5rem;
+}
+
+.s-gender-btn {
+  flex: 1;
+  padding: .6rem .8rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  font-family: var(--font);
+  font-size: .85rem;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+  transition: all .15s;
+}
+
+.s-gender-btn:hover { border-color: var(--brand); background: var(--brand-soft); }
+
+.s-gender-btn.active {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+}
+
+/* ── Submit button ────────────────────────────────────────── */
+
+.s-submit-btn {
+  width: 100%;
+  padding: 1rem;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--brand);
+  color: #fff;
+  font-family: var(--font);
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: .01em;
+  cursor: pointer;
+  transition: background .15s, transform .1s;
+  margin-bottom: .85rem;
+}
+.s-submit-btn:hover   { background: var(--brand-dark); transform: translateY(-1px); }
+.s-submit-btn:active  { transform: translateY(0); }
+.s-submit-btn:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+
+.s-guarantee {
+  text-align: center;
+  font-size: .78rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* ── Success section ──────────────────────────────────────── */
+
+.s-success {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.75rem;
+  box-shadow: var(--shadow);
+}
+
+.s-success-inner {
+  text-align: center;
+  max-width: 440px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .75rem;
+}
+
+.s-success-icon {
+  font-size: 3rem;
+  line-height: 1;
+}
+
+.s-success h2 {
+  font-size: 1.4rem;
+  font-weight: 600;
+  letter-spacing: -.02em;
+}
+
+.s-success p {
+  font-size: .9rem;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+.s-success-details {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 1rem 1.1rem;
+  text-align: left;
+  font-size: .85rem;
+  line-height: 1.8;
+  color: var(--text);
+}
+
+.s-success-btn {
+  padding: .75rem 2rem;
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--brand);
+  background: transparent;
+  color: var(--brand);
+  font-family: var(--font);
+  font-size: .95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+  margin-top: .25rem;
+}
+.s-success-btn:hover { background: var(--brand); color: #fff; }
+
+/* ── Mobile responsive ────────────────────────────────────── */
+
+@media (max-width: 559px) {
+  .s-page-title h1   { font-size: 1.5rem; }
+  .s-main            { padding: 1.5rem 1rem 4rem; }
+  .s-step            { padding: 1.25rem; }
+  .s-service-row     { gap: .5rem; }
+  .s-service-btn     { min-width: 100%; flex-direction: row; align-items: center; gap: .75rem; }
+  .s-service-icon    { font-size: 1.25rem; }
+  .s-form-grid       { grid-template-columns: 1fr; }
+  .s-field--full     { grid-column: 1; }
+  .s-mobile-banner   { display: flex; }
+
+  /* Desktop days strip → hidden header columns */
+  .s-day-col-header  { display: none; }
+
+  /* Mobile slots: show time pills stacked horizontally */
+  .s-slots-grid {
+    grid-template-columns: 1fr;
+  }
+  .s-day-col.is-mobile-active {
+    flex-direction: row;
+    gap: .5rem;
+  }
+  .s-slot-btn {
+    flex-direction: row;
+    justify-content: space-between;
+    padding: .8rem 1rem;
+  }
+  .s-slot-time   { font-size: 1rem; }
+  .s-slot-status { font-size: .8rem; text-align: right; }
+}
