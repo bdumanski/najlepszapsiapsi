@@ -1,13 +1,48 @@
 /* ==========================================================================
    PsiApsi — spotkania.js
-   Minimalna, krokowa rezerwacja (Wod Guru-inspired)
+   Dynamiczne usługi, grafik i lokalizacje sterowane z Google Sheets
    ========================================================================== */
 
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby3JNKKwOicbrz1LZm92jrqPS47xdXWRbJE8lOv8xDdkOOPQXRrvXi1_Y6zeNopKOAtKA/exec';
 
 const dayNames      = ['Poniedziałek','Wtorek','Środa','Czwartek','Piątek','Sobota','Niedziela'];
 const shortDayNames = ['Pn','Wt','Śr','Cz','Pt','Sb','Nd'];
-const availableHours = ['18:00','19:00','20:00'];
+
+// Domyślne wartości zapasowe (nadpisywane danymi z Arkusza Google)
+let availableServices = [
+  {
+    id: "1-1",
+    name: "Spacer 1-1",
+    icon: "🦮",
+    desc: "Indywidualny, 1 pies",
+    maxDogs: 1,
+    is1on1: true,
+    locations: ["Warszawa Wawer (trasy leśne MPK)"]
+  },
+  {
+    id: "grupowy",
+    name: "Spacer grupowy",
+    icon: "🐕‍🦺",
+    desc: "Do 3 psów, socjalizacja",
+    maxDogs: 3,
+    is1on1: false,
+    locations: ["Warszawa Wawer (trasy leśne MPK)"]
+  },
+  {
+    id: "konsultacja",
+    name: "Konsultacja",
+    icon: "🎓",
+    desc: "Behawioralna, diagnoza",
+    maxDogs: 1,
+    is1on1: true,
+    locations: ["Warszawa Wawer (trasy leśne MPK)", "Dojazd do klienta"]
+  }
+];
+
+let scheduleConfig = {
+  defaultHours: ['18:00', '19:00', '20:00'],
+  days: {}
+};
 
 // ── Stan aplikacji ──────────────────────────────────────────
 let currentMonday        = getMonday(new Date());
@@ -20,6 +55,7 @@ let selectedDayDate      = null;
 let selectedMobileDayIndex = getInitialMobileDayIndex();
 
 // ── DOM refs ────────────────────────────────────────────────
+const serviceRowContainer= document.getElementById('serviceRowContainer');
 const weekRangeLabel     = document.getElementById('weekRangeLabel');
 const studioGrid         = document.getElementById('studioGrid');
 const prevWeekBtn        = document.getElementById('prevWeekBtn');
@@ -110,29 +146,161 @@ function getInitialMobileDayIndex() {
   return (diff >= 0 && diff < 7) ? diff : 0;
 }
 
-// ── Pobieranie danych ───────────────────────────────────────
+// Zwraca godziny dostępne dla konkretnego dnia tygodnia lub konkretnej daty
+function getHoursForDay(dayDate, dayIndex) {
+  const dateISO = formatDateISO(dayDate);
+  const dayNameLower = dayNames[dayIndex].toLowerCase();
+
+  // Sprawdzamy czy w grafiku jest wpis na konkretną datę (np. urlop lub wyjątek)
+  if (scheduleConfig.days && scheduleConfig.days[dateISO] !== undefined) {
+    return scheduleConfig.days[dateISO];
+  }
+
+  // Sprawdzamy czy jest wpis dla danego dnia tygodnia (np. sobota, niedziela)
+  if (scheduleConfig.days && scheduleConfig.days[dayNameLower] !== undefined) {
+    return scheduleConfig.days[dayNameLower];
+  }
+
+  // W przeciwnym razie domyślne godziny
+  return scheduleConfig.defaultHours || ['18:00', '19:00', '20:00'];
+}
+
+// Próba odczytu zapamiętanych usług i grafiku z pamięci podręcznej (błyskawiczne ładowanie bez migotania)
+try {
+  const cachedServices = localStorage.getItem('psiapsi_services_cache');
+  if (cachedServices) availableServices = JSON.parse(cachedServices);
+  const cachedSchedule = localStorage.getItem('psiapsi_schedule_cache');
+  if (cachedSchedule) scheduleConfig = JSON.parse(cachedSchedule);
+} catch (e) {
+  // Ignoruj błędy localStorage
+}
+
+// ── Pobieranie danych z Google Apps Script ───────────────────
 
 async function fetchBookings() {
   if (studioGrid && bookedData.length === 0) {
-    studioGrid.innerHTML = '<div style="grid-column:1/-1;padding:3rem 1rem;text-align:center;color:#9CA3AF;font-size:.9rem;">🐾 Ładowanie grafiku...</div>';
+    studioGrid.innerHTML = '<div style="grid-column:1/-1;padding:3rem 1rem;text-align:center;color:#9CA3AF;font-size:.9rem;">🐾 Ładowanie aktualnego grafiku...</div>';
   }
   try {
     const res  = await fetch(APPS_SCRIPT_URL);
     const json = await res.json();
-    if (json.status === 'success' && Array.isArray(json.bookedSlots)) {
-      bookedData = json.bookedSlots.map(b => ({
-        date:        normalizeDate(b.date),
-        timeSlot:    normalizeTime(b.timeSlot),
-        serviceType: String(b.serviceType || '').trim()
-      }));
+
+    if (json.status === 'success') {
+      // 1. Rezerwacje
+      if (Array.isArray(json.bookedSlots)) {
+        bookedData = json.bookedSlots.map(b => ({
+          date:        normalizeDate(b.date),
+          timeSlot:    normalizeTime(b.timeSlot),
+          serviceType: String(b.serviceType || '').trim()
+        }));
+      }
+
+      // 2. Usługi (jeśli skonfigurowane w arkuszu)
+      if (Array.isArray(json.services) && json.services.length > 0) {
+        availableServices = json.services;
+        try {
+          localStorage.setItem('psiapsi_services_cache', JSON.stringify(availableServices));
+        } catch (e) {}
+
+        const exists = availableServices.some(s => s.name === selectedService);
+        if (!exists) {
+          selectedService = availableServices[0].name;
+        }
+      }
+
+      // 3. Grafik (jeśli skonfigurowany w arkuszu)
+      if (json.schedule && typeof json.schedule === 'object') {
+        scheduleConfig = json.schedule;
+        try {
+          localStorage.setItem('psiapsi_schedule_cache', JSON.stringify(scheduleConfig));
+        } catch (e) {}
+      }
     }
   } catch (err) {
-    console.error('Błąd pobierania rezerwacji:', err);
+    console.error('Błąd pobierania danych z Arkusza:', err);
   }
+
+  renderServices();
   renderCalendar();
+  updateLocationOptions();
 }
 
-// ── Renderowanie kalendarza ─────────────────────────────────
+// ── Dynamiczne renderowanie usług (Krok 1) ───────────────────
+
+function renderServices() {
+  if (!serviceRowContainer) return;
+  serviceRowContainer.innerHTML = '';
+
+  availableServices.forEach(srv => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 's-service-btn' + (srv.name === selectedService ? ' active' : '');
+    btn.dataset.service = srv.name;
+
+    btn.innerHTML = `
+      <span class="s-service-icon">${srv.icon || '🐾'}</span>
+      <span class="s-service-name">${srv.name}</span>
+      <span class="s-service-desc">${srv.desc || ''}</span>
+    `;
+
+    btn.addEventListener('click', () => {
+      selectedService = srv.name;
+      document.querySelectorAll('.s-service-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      if (serviceTypeHidden) serviceTypeHidden.value = selectedService;
+      
+      updateLocationOptions();
+
+      // Odśwież podsumowanie jeśli slot był wybrany
+      if (selectedDateStr && selectedSummaryText) {
+        const d = selectedDayDate || new Date(selectedDateStr);
+        const dayLabel = dayNames[d.getDay() === 0 ? 6 : d.getDay() - 1];
+        selectedSummaryText.textContent = `${dayLabel}, ${formatDatePL(d)} · godz. ${selectedHour} · ${selectedService}`;
+      }
+    });
+
+    serviceRowContainer.appendChild(btn);
+  });
+
+  if (serviceTypeHidden) serviceTypeHidden.value = selectedService;
+}
+
+// ── Aktualizacja listy lokalizacji dla wybranej usługi ────────
+
+function updateLocationOptions() {
+  if (!locationSelect) return;
+
+  const currentServiceObj = availableServices.find(s => s.name === selectedService);
+  const locList = (currentServiceObj && currentServiceObj.locations && currentServiceObj.locations.length > 0)
+    ? currentServiceObj.locations
+    : ["Warszawa Wawer (trasy leśne MPK)"];
+
+  locationSelect.innerHTML = '';
+
+  locList.forEach((loc, idx) => {
+    const opt = document.createElement('option');
+    opt.value = loc;
+    opt.textContent = loc;
+    if (idx === 0) opt.selected = true;
+    locationSelect.appendChild(opt);
+  });
+
+  // Dodajemy opcję "Inna lokalizacja..."
+  const otherOpt = document.createElement('option');
+  otherOpt.value = 'Inna';
+  otherOpt.textContent = 'Inna lokalizacja (wpisz poniżej)…';
+  locationSelect.appendChild(otherOpt);
+
+  if (otherLocationGroup) {
+    otherLocationGroup.classList.add('s-field--hidden');
+  }
+  if (otherLocationInput) {
+    otherLocationInput.required = false;
+    otherLocationInput.value = '';
+  }
+}
+
+// ── Renderowanie kalendarza (Krok 2) ──────────────────────────
 
 function renderCalendar() {
   if (!studioGrid) return;
@@ -140,12 +308,10 @@ function renderCalendar() {
   const sunday = new Date(currentMonday);
   sunday.setDate(sunday.getDate() + 6);
 
-  // Etykieta tygodnia
   if (weekRangeLabel) {
     weekRangeLabel.textContent = `${formatDatePL(currentMonday)} – ${formatDatePL(sunday)} ${sunday.getFullYear()}`;
   }
 
-  // Blokada cofania przed bieżący tydzień
   if (prevWeekBtn) {
     prevWeekBtn.disabled = currentMonday <= getMonday(new Date());
   }
@@ -165,7 +331,6 @@ function renderCalendar() {
       + (isMobActive ? ' is-mobile-active'  : '');
     col.dataset.dayIndex = i;
 
-    // Nagłówek kolumny
     const hdr = document.createElement('div');
     hdr.className = 's-day-col-header';
     hdr.innerHTML = `
@@ -174,60 +339,76 @@ function renderCalendar() {
     `;
     col.appendChild(hdr);
 
-    // Sloty godzinowe
-    availableHours.forEach(hour => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 's-slot-btn';
+    const hoursForThisDay = getHoursForDay(dayDate, i);
 
-      const inPast    = isSlotInPast(dayDate, hour);
-      const matches   = bookedData.filter(b => b.date === dateStr && b.timeSlot === hour);
-      const has1on1   = matches.some(m => {
-        const s = (m.serviceType || '').toLowerCase();
-        return s.includes('1-1') || s.includes('indywidualny') || s.includes('konsultacja');
+    if (hoursForThisDay.length === 0) {
+      const offLabel = document.createElement('div');
+      offLabel.style.cssText = 'padding:1rem .3rem;font-size:.75rem;color:#9CA3AF;text-align:center;';
+      offLabel.textContent = 'Brak terminów';
+      col.appendChild(offLabel);
+    } else {
+      hoursForThisDay.forEach(hour => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 's-slot-btn';
+
+        const inPast    = isSlotInPast(dayDate, hour);
+        const matches   = bookedData.filter(b => b.date === dateStr && b.timeSlot === hour);
+        
+        // Sprawdzamy czy którykolwiek zapisany slot to zajęcia indywidualne
+        const has1on1 = matches.some(m => {
+          const s = (m.serviceType || '').toLowerCase();
+          const sObj = availableServices.find(x => x.name.toLowerCase() === s);
+          if (sObj) return sObj.is1on1;
+          return s.includes('1-1') || s.includes('indywidualny') || s.includes('konsultacja');
+        });
+
+        const activeServiceObj = availableServices.find(s => s.name === selectedService);
+        const currentMaxDogs = activeServiceObj ? activeServiceObj.maxDogs : 3;
+
+        const groupCount = matches.length;
+
+        let statusText = '';
+        let isFull     = false;
+
+        if (inPast) {
+          btn.classList.add('is-past');
+          statusText = 'Minął';
+          btn.disabled = true;
+        } else if (has1on1) {
+          isFull = true;
+          btn.classList.add('is-full');
+          statusText = 'Zajęty';
+          btn.disabled = true;
+        } else if (groupCount >= currentMaxDogs) {
+          isFull = true;
+          btn.classList.add('is-full');
+          statusText = 'Brak miejsc';
+          btn.disabled = true;
+        } else if (groupCount > 0) {
+          btn.classList.add('is-partial');
+          statusText = `Zapisanych ${groupCount}/${currentMaxDogs}`;
+        } else {
+          btn.classList.add('is-available');
+          statusText = 'Wolny';
+        }
+
+        if (dateStr === selectedDateStr && hour === selectedHour) {
+          btn.classList.add('is-selected');
+        }
+
+        btn.innerHTML = `
+          <span class="s-slot-time">${hour}</span>
+          <span class="s-slot-status">${statusText}</span>
+        `;
+
+        if (!inPast && !isFull) {
+          btn.addEventListener('click', () => selectSlot(dateStr, hour, dayDate, i, groupCount));
+        }
+
+        col.appendChild(btn);
       });
-      const groupCount = matches.filter(m => (m.serviceType || '').toLowerCase().includes('grupow')).length;
-
-      let statusText = '';
-      let isFull     = false;
-
-      if (inPast) {
-        btn.classList.add('is-past');
-        statusText = 'Minął';
-        btn.disabled = true;
-      } else if (has1on1) {
-        isFull = true;
-        btn.classList.add('is-full');
-        statusText = 'Zajęty';
-        btn.disabled = true;
-      } else if (groupCount >= 3) {
-        isFull = true;
-        btn.classList.add('is-full');
-        statusText = 'Brak miejsc';
-        btn.disabled = true;
-      } else if (groupCount > 0) {
-        btn.classList.add('is-partial');
-        statusText = `Grupowy ${groupCount}/3`;
-      } else {
-        btn.classList.add('is-available');
-        statusText = 'Wolny';
-      }
-
-      if (dateStr === selectedDateStr && hour === selectedHour) {
-        btn.classList.add('is-selected');
-      }
-
-      btn.innerHTML = `
-        <span class="s-slot-time">${hour}</span>
-        <span class="s-slot-status">${statusText}</span>
-      `;
-
-      if (!inPast && !isFull) {
-        btn.addEventListener('click', () => selectSlot(dateStr, hour, dayDate, i, groupCount));
-      }
-
-      col.appendChild(btn);
-    });
+    }
 
     studioGrid.appendChild(col);
   }
@@ -244,32 +425,31 @@ function selectSlot(dateStr, hour, dayDate, dayIndex, groupCount) {
   selectedDayDate        = dayDate;
   selectedMobileDayIndex = dayIndex;
 
-  // Synchronizacja ukrytych pól
-  if (bookingDateInput) bookingDateInput.value = dateStr;
-  if (timeSlotHidden)   timeSlotHidden.value   = hour;
+  if (bookingDateInput)  bookingDateInput.value  = dateStr;
+  if (timeSlotHidden)    timeSlotHidden.value    = hour;
   if (serviceTypeHidden) serviceTypeHidden.value = selectedService;
 
-  // Przy slotach grupowych wymuś usługę grupową
+  // Jeśli ktoś dołącza do grupy
   if (groupCount > 0) {
-    selectedService = 'Spacer grupowy';
-    if (serviceTypeHidden) serviceTypeHidden.value = 'Spacer grupowy';
-    document.querySelectorAll('.s-service-btn').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.service === 'Spacer grupowy');
-    });
+    const groupService = availableServices.find(s => !s.is1on1) || availableServices[0];
+    if (groupService) {
+      selectedService = groupService.name;
+      if (serviceTypeHidden) serviceTypeHidden.value = groupService.name;
+      document.querySelectorAll('.s-service-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.service === groupService.name);
+      });
+      updateLocationOptions();
+    }
   }
 
-  // Aktualizuj pasek podsumowania w kroku 3
   if (selectedSummaryText) {
     const dayLabel = dayNames[dayDate.getDay() === 0 ? 6 : dayDate.getDay() - 1];
     selectedSummaryText.textContent = `${dayLabel}, ${formatDatePL(dayDate)} · godz. ${hour} · ${selectedService}`;
   }
 
-  // Pokaż krok 3 (formularz)
   showStep3();
-
   renderCalendar();
 
-  // Płynne przewinięcie do formularza
   if (step3Section) {
     setTimeout(() => step3Section.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
   }
@@ -289,27 +469,30 @@ function hideStep3() {
   }
 }
 
-// ── Pasek dni (desktop + mobile scroll) ────────────────────
+// ── Pasek dni (mobile & strip) ──────────────────────────────
 
 function renderDaysStrip() {
   if (!mobileDaysStrip) return;
   mobileDaysStrip.innerHTML = '';
 
   for (let i = 0; i < 7; i++) {
-    const dayDate  = new Date(currentMonday);
+    const dayDate   = new Date(currentMonday);
     dayDate.setDate(dayDate.getDate() + i);
-    const dateStr  = formatDateISO(dayDate);
+    const dateStr   = formatDateISO(dayDate);
     const todayFlag = isToday(dayDate);
 
+    const dayHours = getHoursForDay(dayDate, i);
     let hasAvailable = false, hasPartial = false;
-    availableHours.forEach(hour => {
+
+    dayHours.forEach(hour => {
       const inPast  = isSlotInPast(dayDate, hour);
       const matches = bookedData.filter(b => b.date === dateStr && b.timeSlot === hour);
       const has1on1 = matches.some(m => {
         const s = (m.serviceType || '').toLowerCase();
-        return s.includes('1-1') || s.includes('indywidualny') || s.includes('konsultacja');
+        const sObj = availableServices.find(x => x.name.toLowerCase() === s);
+        return sObj ? sObj.is1on1 : (s.includes('1-1') || s.includes('indywidualny') || s.includes('konsultacja'));
       });
-      const groupCount = matches.filter(m => (m.serviceType || '').toLowerCase().includes('grupow')).length;
+      const groupCount = matches.length;
       if (!inPast && !has1on1 && groupCount < 3) {
         if (groupCount > 0) hasPartial = true;
         else hasAvailable = true;
@@ -339,42 +522,22 @@ function renderDaysStrip() {
 }
 
 function updateMobileView() {
-  // Pigułki
   if (mobileDaysStrip) {
     mobileDaysStrip.querySelectorAll('.s-day-pill').forEach((p, idx) => {
       p.classList.toggle('active', idx === selectedMobileDayIndex);
     });
   }
-  // Kolumny siatki
   if (studioGrid) {
     studioGrid.querySelectorAll('.s-day-col').forEach((col, idx) => {
       col.classList.toggle('is-mobile-active', idx === selectedMobileDayIndex);
     });
   }
-  // Tytuł banera mobilnego
   if (mobileDayBannerTitle) {
     const d = new Date(currentMonday);
     d.setDate(d.getDate() + selectedMobileDayIndex);
     mobileDayBannerTitle.textContent = `${dayNames[selectedMobileDayIndex]}, ${formatDatePL(d)}`;
   }
 }
-
-// ── Wybór usługi (krok 1) ───────────────────────────────────
-
-document.querySelectorAll('.s-service-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    selectedService = btn.dataset.service;
-    document.querySelectorAll('.s-service-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    if (serviceTypeHidden) serviceTypeHidden.value = selectedService;
-    // Odśwież pasek podsumowania jeśli jest wybrany slot
-    if (selectedDateStr && selectedSummaryText) {
-      const d = selectedDayDate || new Date(selectedDateStr);
-      const dayLabel = dayNames[d.getDay() === 0 ? 6 : d.getDay() - 1];
-      selectedSummaryText.textContent = `${dayLabel}, ${formatDatePL(d)} · godz. ${selectedHour} · ${selectedService}`;
-    }
-  });
-});
 
 // ── Płeć psa ────────────────────────────────────────────────
 
@@ -386,7 +549,7 @@ document.querySelectorAll('.s-gender-btn').forEach(btn => {
   });
 });
 
-// ── Lokalizacja ─────────────────────────────────────────────
+// ── Obsługa wyboru lokalizacji ──────────────────────────────
 
 if (locationSelect) {
   locationSelect.addEventListener('change', () => {
@@ -426,13 +589,13 @@ if (spotkaniaForm) {
       return;
     }
 
-    const fd         = new FormData(spotkaniaForm);
-    const firstName  = fd.get('firstName');
-    const lastName   = fd.get('lastName');
+    const fd          = new FormData(spotkaniaForm);
+    const firstName   = fd.get('firstName');
+    const lastName    = fd.get('lastName');
     const clientEmail = fd.get('clientEmail');
-    const dogName    = fd.get('dogName');
-    const dogAge     = fd.get('dogAge');
-    const locValue   = fd.get('location') === 'Inna' ? fd.get('otherLocation') : fd.get('location');
+    const dogName     = fd.get('dogName');
+    const dogAge      = fd.get('dogAge');
+    const locValue    = fd.get('location') === 'Inna' ? fd.get('otherLocation') : fd.get('location');
 
     const [yr, mo, da] = selectedDateStr.split('-').map(Number);
     const dateDisplay  = formatDateFullPL(new Date(yr, mo - 1, da));
@@ -471,7 +634,6 @@ if (spotkaniaForm) {
           `;
         }
 
-        // Pokaż sukces, ukryj formularz
         hideStep3();
         if (successSection) {
           successSection.classList.remove('s-step--hidden');
@@ -499,7 +661,7 @@ if (spotkaniaForm) {
   });
 }
 
-// ── Zamknij sukces / wróć ────────────────────────────────────
+// ── Zamknij sukces / powrót ─────────────────────────────────
 
 if (closeModalBtn) {
   closeModalBtn.addEventListener('click', () => {
@@ -573,5 +735,5 @@ if (mobileNextDayBtn) {
   });
 }
 
-// ── Start ────────────────────────────────────────────────────
+// ── Inicjalizacja ───────────────────────────────────────────
 fetchBookings();

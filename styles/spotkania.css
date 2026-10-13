@@ -216,6 +216,30 @@ body {
   line-height: 1.3;
 }
 
+.s-service-loading {
+  width: 100%;
+  padding: 1.25rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: .88rem;
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .5rem;
+}
+
+.s-service-loading-dot {
+  animation: pulsePaw 1.4s infinite ease-in-out;
+}
+
+@keyframes pulsePaw {
+  0%, 100% { transform: scale(1); opacity: .7; }
+  50% { transform: scale(1.2); opacity: 1; }
+}
+
 /* ── Week nav (Step 2) ────────────────────────────────────── */
 
 .s-week-nav {
