@@ -567,6 +567,14 @@ body {
   box-shadow: 0 0 0 3px rgba(27,107,80,.1);
 }
 
+.s-field select:disabled {
+  background: var(--bg);
+  color: var(--text);
+  border-color: var(--border);
+  cursor: not-allowed;
+  opacity: .9;
+}
+
 .s-field-hint {
   font-size: .75rem;
   color: var(--text-muted);

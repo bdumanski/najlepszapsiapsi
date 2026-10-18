@@ -39,6 +39,7 @@ function doPost(e) {
     var existing1on1 = false;
     var existingGroupCount = 0;
     var existingTotal = 0;
+    var existingSlotLocation = '';
 
     for (var i = 1; i < allRows.length; i++) {
       var row = allRows[i];
@@ -47,19 +48,23 @@ function doPost(e) {
 
       if (rowDate === requestedDate && rowTime === requestedTime) {
         existingTotal++;
-        var rowService = String(row[3] || '').toLowerCase();
-        
+        var rowService = String(row[3] || '').trim();
+        var rowLocation = String(row[4] || '').trim();
+        if (rowLocation && !existingSlotLocation) {
+          existingSlotLocation = rowLocation;
+        }
+
         var rowIs1on1 = false;
         for (var sc = 0; sc < servicesConfig.length; sc++) {
-          if (servicesConfig[sc].name.toLowerCase() === rowService) {
+          if (servicesConfig[sc].name.toLowerCase() === rowService.toLowerCase()) {
             rowIs1on1 = servicesConfig[sc].is1on1;
             break;
           }
         }
         if (!rowIs1on1) {
-          rowIs1on1 = (rowService.indexOf('1-1') !== -1 || 
-                       rowService.indexOf('indywidualny') !== -1 || 
-                       rowService.indexOf('konsultacj') !== -1);
+          rowIs1on1 = (rowService.toLowerCase().indexOf('1-1') !== -1 || 
+                       rowService.toLowerCase().indexOf('indywidualny') !== -1 || 
+                       rowService.toLowerCase().indexOf('konsultacj') !== -1);
         }
 
         if (rowIs1on1) {
@@ -88,7 +93,36 @@ function doPost(e) {
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
-    // 3. Limit psów na dany slot
+    // 3. Sprawdzenie spójności rodzaju zajęć w slocie grupowym
+    if (!is1on1 && existingTotal > 0) {
+      for (var chk = 1; chk < allRows.length; chk++) {
+        var r = allRows[chk];
+        var rDate = formatSheetDate(r[0], tz);
+        var rTime = formatSheetTime(r[2], tz);
+        if (rDate === requestedDate && rTime === requestedTime) {
+          var rService = String(r[3] || '').trim();
+          if (rService && rService.toLowerCase() !== requestedService) {
+            lock.releaseLock();
+            return ContentService.createTextOutput(JSON.stringify({
+              status: 'conflict',
+              message: 'W tym terminie odbywają się już inne zajęcia (' + rService + '). Nie można mieszać różnych rodzajów treningów w jednym slocie.'
+            })).setMimeType(ContentService.MimeType.JSON);
+          }
+        }
+      }
+    }
+
+    // 4. Sprawdzenie spójności lokalizacji dla spaceru grupowego
+    var requestedLocation = String(data.location || '').trim();
+    if (!is1on1 && existingSlotLocation && requestedLocation && existingSlotLocation.toLowerCase() !== requestedLocation.toLowerCase()) {
+      lock.releaseLock();
+      return ContentService.createTextOutput(JSON.stringify({
+        status: 'conflict',
+        message: 'Dla tego terminu wybrano już inną lokalizację spotkania: ' + existingSlotLocation + '. W zajęciach grupowych wszyscy uczestnicy spotykają się w tym samym miejscu.'
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 5. Limit psów na dany slot
     if (!is1on1 && existingGroupCount >= maxDogs) {
       lock.releaseLock();
       return ContentService.createTextOutput(JSON.stringify({
@@ -199,12 +233,14 @@ function doGet(e) {
       var rowDate = formatSheetDate(row[0], tz);
       var rowTime = formatSheetTime(row[2], tz);
       var serviceType = String(row[3] || '').trim();
+      var location = String(row[4] || '').trim();
 
       if (rowDate && rowTime) {
         bookedSlots.push({
           date: rowDate,
           timeSlot: rowTime,
-          serviceType: serviceType
+          serviceType: serviceType,
+          location: location
         });
       }
     }

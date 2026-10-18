@@ -72,8 +72,6 @@ const bookingDateInput   = document.getElementById('bookingDateInput');
 const timeSlotHidden     = document.getElementById('timeSlot');
 const serviceTypeHidden  = document.getElementById('serviceType');
 const locationSelect     = document.getElementById('locationSelect');
-const otherLocationGroup = document.getElementById('otherLocationGroup');
-const otherLocationInput = document.getElementById('otherLocation');
 const submitBtn          = document.getElementById('submitBtn');
 const submitBtnText      = document.getElementById('submitBtnText');
 const selectedSummaryText = document.getElementById('selectedSummaryText');
@@ -191,7 +189,8 @@ async function fetchBookings() {
         bookedData = json.bookedSlots.map(b => ({
           date:        normalizeDate(b.date),
           timeSlot:    normalizeTime(b.timeSlot),
-          serviceType: String(b.serviceType || '').trim()
+          serviceType: String(b.serviceType || '').trim(),
+          location:    String(b.location || '').trim()
         }));
       }
 
@@ -249,12 +248,26 @@ function renderServices() {
       btn.classList.add('active');
       if (serviceTypeHidden) serviceTypeHidden.value = selectedService;
       
+      // Jeśli wybrany wcześniej slot ma już zapisaną inną usługę, odznacz slot
+      if (selectedDateStr && selectedHour) {
+        const matches = bookedData.filter(b => b.date === selectedDateStr && b.timeSlot === selectedHour);
+        if (matches.length > 0) {
+          const bookedService = matches[0].serviceType || '';
+          if (bookedService.toLowerCase() !== srv.name.toLowerCase()) {
+            selectedDateStr = '';
+            selectedHour = '';
+            hideStep3();
+          }
+        }
+      }
+
       updateLocationOptions();
+      renderCalendar();
 
       // Odśwież podsumowanie jeśli slot był wybrany
       if (selectedDateStr && selectedSummaryText) {
         const d = selectedDayDate || new Date(selectedDateStr);
-        const dayLabel = dayNames[d.getDay() === 0 ? 6 : d.getDay() - 1];
+        const dayLabel = dayNames[d.getDay() === 0 ? 6 : dayDate.getDay() - 1];
         selectedSummaryText.textContent = `${dayLabel}, ${formatDatePL(d)} · godz. ${selectedHour} · ${selectedService}`;
       }
     });
@@ -267,7 +280,7 @@ function renderServices() {
 
 // ── Aktualizacja listy lokalizacji dla wybranej usługi ────────
 
-function updateLocationOptions() {
+function updateLocationOptions(fixedLocation = null) {
   if (!locationSelect) return;
 
   const currentServiceObj = availableServices.find(s => s.name === selectedService);
@@ -277,6 +290,21 @@ function updateLocationOptions() {
 
   locationSelect.innerHTML = '';
 
+  // Jeśli w danym slocie grupowym jest już ustalona lokalizacja przez pierwszą osobę
+  if (fixedLocation) {
+    const opt = document.createElement('option');
+    opt.value = fixedLocation;
+    opt.textContent = fixedLocation;
+    opt.selected = true;
+    locationSelect.appendChild(opt);
+
+    locationSelect.disabled = true;
+    return;
+  }
+
+  // W przeciwnym razie odblokuj pole wyboru
+  locationSelect.disabled = false;
+
   locList.forEach((loc, idx) => {
     const opt = document.createElement('option');
     opt.value = loc;
@@ -284,20 +312,6 @@ function updateLocationOptions() {
     if (idx === 0) opt.selected = true;
     locationSelect.appendChild(opt);
   });
-
-  // Dodajemy opcję "Inna lokalizacja..."
-  const otherOpt = document.createElement('option');
-  otherOpt.value = 'Inna';
-  otherOpt.textContent = 'Inna lokalizacja (wpisz poniżej)…';
-  locationSelect.appendChild(otherOpt);
-
-  if (otherLocationGroup) {
-    otherLocationGroup.classList.add('s-field--hidden');
-  }
-  if (otherLocationInput) {
-    otherLocationInput.required = false;
-    otherLocationInput.value = '';
-  }
 }
 
 // ── Renderowanie kalendarza (Krok 2) ──────────────────────────
@@ -317,6 +331,13 @@ function renderCalendar() {
   }
 
   studioGrid.innerHTML = '';
+
+  // Pobieramy limity psów dla usług grupowych
+  const groupServiceObj = availableServices.find(s => !s.is1on1) || { maxDogs: 3 };
+  const maxGroupDogs = groupServiceObj.maxDogs || 3;
+
+  const activeServiceObj = availableServices.find(s => s.name === selectedService);
+  const isSelecting1on1 = activeServiceObj ? activeServiceObj.is1on1 : false;
 
   for (let i = 0; i < 7; i++) {
     const dayDate    = new Date(currentMonday);
@@ -352,24 +373,35 @@ function renderCalendar() {
         btn.type = 'button';
         btn.className = 's-slot-btn';
 
-        const inPast    = isSlotInPast(dayDate, hour);
-        const matches   = bookedData.filter(b => b.date === dateStr && b.timeSlot === hour);
+        const inPast  = isSlotInPast(dayDate, hour);
+        const matches = bookedData.filter(b => b.date === dateStr && b.timeSlot === hour);
         
-        // Sprawdzamy czy którykolwiek zapisany slot to zajęcia indywidualne
+        // Czy w tym slocie jest rezerwacja indywidualna 1-1
         const has1on1 = matches.some(m => {
           const s = (m.serviceType || '').toLowerCase();
           const sObj = availableServices.find(x => x.name.toLowerCase() === s);
-          if (sObj) return sObj.is1on1;
-          return s.includes('1-1') || s.includes('indywidualny') || s.includes('konsultacja');
+          return sObj ? sObj.is1on1 : (s.includes('1-1') || s.includes('indywidualny') || s.includes('konsultacja'));
         });
 
-        const activeServiceObj = availableServices.find(s => s.name === selectedService);
-        const currentMaxDogs = activeServiceObj ? activeServiceObj.maxDogs : 3;
-
         const groupCount = matches.length;
-
         let statusText = '';
         let isFull     = false;
+
+        // Nazwa i konfiguracja usługi zarezerwowanej w tym slocie
+        let slotService = '';
+        let slotLocation = '';
+        let slotMaxDogs = maxGroupDogs;
+
+        if (groupCount > 0) {
+          slotService = matches[0].serviceType || '';
+          const sObj = availableServices.find(x => x.name.toLowerCase() === slotService.toLowerCase());
+          if (sObj && sObj.maxDogs) slotMaxDogs = sObj.maxDogs;
+
+          const bookedWithLoc = matches.find(m => m.location);
+          if (bookedWithLoc) slotLocation = bookedWithLoc.location;
+        }
+
+        const isSameService = slotService ? (selectedService.toLowerCase() === slotService.toLowerCase()) : true;
 
         if (inPast) {
           btn.classList.add('is-past');
@@ -378,17 +410,29 @@ function renderCalendar() {
         } else if (has1on1) {
           isFull = true;
           btn.classList.add('is-full');
-          statusText = 'Zajęty';
+          statusText = 'Zajęty (1-1)';
           btn.disabled = true;
-        } else if (groupCount >= currentMaxDogs) {
+        } else if (groupCount >= slotMaxDogs) {
           isFull = true;
           btn.classList.add('is-full');
           statusText = 'Brak miejsc';
           btn.disabled = true;
         } else if (groupCount > 0) {
-          btn.classList.add('is-partial');
-          statusText = `Zapisanych ${groupCount}/${currentMaxDogs}`;
+          // Trwa zapis na konkretne zajęcia grupowe
+          const remaining = slotMaxDogs - groupCount;
+
+          if (isSameService) {
+            btn.classList.add('is-partial');
+            statusText = `${slotService} (${groupCount}/${slotMaxDogs}) • wolne: ${remaining}`;
+          } else {
+            // Użytkownik ma zaznaczoną inną usługę (np. inne zajęcia grupowe lub 1-1)
+            btn.classList.add('is-full');
+            statusText = `Zajęty (${slotService})`;
+            isFull = true;
+            btn.disabled = true;
+          }
         } else {
+          // Slot jest całkowicie pusty
           btn.classList.add('is-available');
           statusText = 'Wolny';
         }
@@ -403,7 +447,7 @@ function renderCalendar() {
         `;
 
         if (!inPast && !isFull) {
-          btn.addEventListener('click', () => selectSlot(dateStr, hour, dayDate, i, groupCount));
+          btn.addEventListener('click', () => selectSlot(dateStr, hour, dayDate, i, groupCount, slotLocation, slotService));
         }
 
         col.appendChild(btn);
@@ -419,7 +463,7 @@ function renderCalendar() {
 
 // ── Wybór slotu ─────────────────────────────────────────────
 
-function selectSlot(dateStr, hour, dayDate, dayIndex, groupCount) {
+function selectSlot(dateStr, hour, dayDate, dayIndex, groupCount, fixedLocation = null, bookedServiceName = '') {
   selectedDateStr        = dateStr;
   selectedHour           = hour;
   selectedDayDate        = dayDate;
@@ -427,19 +471,21 @@ function selectSlot(dateStr, hour, dayDate, dayIndex, groupCount) {
 
   if (bookingDateInput)  bookingDateInput.value  = dateStr;
   if (timeSlotHidden)    timeSlotHidden.value    = hour;
-  if (serviceTypeHidden) serviceTypeHidden.value = selectedService;
 
-  // Jeśli ktoś dołącza do grupy
-  if (groupCount > 0) {
-    const groupService = availableServices.find(s => !s.is1on1) || availableServices[0];
-    if (groupService) {
-      selectedService = groupService.name;
-      if (serviceTypeHidden) serviceTypeHidden.value = groupService.name;
+  // Jeśli ktoś klika w slot, w którym trwają już konkretne zajęcia grupowe
+  if (groupCount > 0 && bookedServiceName) {
+    const matchedService = availableServices.find(s => s.name.toLowerCase() === bookedServiceName.toLowerCase());
+    if (matchedService) {
+      selectedService = matchedService.name;
+      if (serviceTypeHidden) serviceTypeHidden.value = matchedService.name;
       document.querySelectorAll('.s-service-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.service === groupService.name);
+        btn.classList.toggle('active', btn.dataset.service === matchedService.name);
       });
-      updateLocationOptions();
     }
+    updateLocationOptions(fixedLocation);
+  } else {
+    if (serviceTypeHidden) serviceTypeHidden.value = selectedService;
+    updateLocationOptions(null);
   }
 
   if (selectedSummaryText) {
@@ -475,6 +521,9 @@ function renderDaysStrip() {
   if (!mobileDaysStrip) return;
   mobileDaysStrip.innerHTML = '';
 
+  const groupServiceObj = availableServices.find(s => !s.is1on1) || { maxDogs: 3 };
+  const maxGroupDogs = groupServiceObj.maxDogs || 3;
+
   for (let i = 0; i < 7; i++) {
     const dayDate   = new Date(currentMonday);
     dayDate.setDate(dayDate.getDate() + i);
@@ -493,7 +542,7 @@ function renderDaysStrip() {
         return sObj ? sObj.is1on1 : (s.includes('1-1') || s.includes('indywidualny') || s.includes('konsultacja'));
       });
       const groupCount = matches.length;
-      if (!inPast && !has1on1 && groupCount < 3) {
+      if (!inPast && !has1on1 && groupCount < maxGroupDogs) {
         if (groupCount > 0) hasPartial = true;
         else hasAvailable = true;
       }
@@ -549,19 +598,6 @@ document.querySelectorAll('.s-gender-btn').forEach(btn => {
   });
 });
 
-// ── Obsługa wyboru lokalizacji ──────────────────────────────
-
-if (locationSelect) {
-  locationSelect.addEventListener('change', () => {
-    const isOther = locationSelect.value === 'Inna';
-    if (otherLocationGroup) otherLocationGroup.classList.toggle('s-field--hidden', !isOther);
-    if (otherLocationInput) {
-      otherLocationInput.required = isOther;
-      if (!isOther) otherLocationInput.value = '';
-    }
-  });
-}
-
 // ── Zmiana terminu ──────────────────────────────────────────
 
 if (changeSelectionBtn) {
@@ -595,7 +631,8 @@ if (spotkaniaForm) {
     const clientEmail = fd.get('clientEmail');
     const dogName     = fd.get('dogName');
     const dogAge      = fd.get('dogAge');
-    const locValue    = fd.get('location') === 'Inna' ? fd.get('otherLocation') : fd.get('location');
+    // Pobieramy bezpośrednio z locationSelect.value, bo pola disabled nie trafiają do FormData
+    const locValue    = locationSelect ? locationSelect.value : (fd.get('location') || '');
 
     const [yr, mo, da] = selectedDateStr.split('-').map(Number);
     const dateDisplay  = formatDateFullPL(new Date(yr, mo - 1, da));
@@ -622,7 +659,12 @@ if (spotkaniaForm) {
       const data = await res.json();
 
       if (data.status === 'success') {
-        bookedData.push({ date: selectedDateStr, timeSlot: selectedHour, serviceType: selectedService });
+        bookedData.push({
+          date:        selectedDateStr,
+          timeSlot:    selectedHour,
+          serviceType: selectedService,
+          location:    locValue
+        });
 
         if (modalSummaryDetails) {
           modalSummaryDetails.innerHTML = `
