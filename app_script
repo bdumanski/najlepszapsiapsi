@@ -1,4 +1,52 @@
+// ── Wspólna odpowiedź JSON ─────────────────────────────────────────────
+function jsonOut(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// ── Licznik lejka rezerwacji ───────────────────────────────────────────
+// Analityka pierwszej strony (first-party): bez cookies, bez firm trzecich,
+// bez danych osobowych. Zapisuje wyłącznie nazwę zdarzenia i krótki kontekst.
+// Dopisuje wiersz do zakładki "Statystyki" (tworzy ją, jeśli nie istnieje).
+function logStat_(event, detail) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Statystyki');
+  if (!sheet) {
+    sheet = ss.insertSheet('Statystyki');
+    sheet.appendRow(['Data', 'Zdarzenie', 'Szczegóły']);
+    sheet.setFrozenRows(1);
+  }
+  var tz = ss.getSpreadsheetTimeZone() || 'Europe/Warsaw';
+  sheet.appendRow([
+    Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd HH:mm:ss'),
+    String(event || '').slice(0, 60),
+    String(detail || '').slice(0, 200)
+  ]);
+}
+
+function trackEvent(data) {
+  try {
+    logStat_(data.event, data.detail);
+    return jsonOut({ status: 'success' });
+  } catch (err) {
+    return jsonOut({ status: 'error', message: err.toString() });
+  }
+}
+
 function doPost(e) {
+  var data;
+  try {
+    data = JSON.parse(e.postData.contents);
+  } catch (parseErr) {
+    return jsonOut({ status: 'error', message: 'Nieprawidłowe dane wejściowe.' });
+  }
+
+  // Zdarzenia lejka (analityka bez cookies i bez firm trzecich)
+  // nie wymagają blokady ani walidacji rezerwacji.
+  if (data && data.type === 'track') {
+    return trackEvent(data);
+  }
+
   var lock = LockService.getScriptLock();
   try {
     lock.waitLock(10000);
@@ -8,7 +56,6 @@ function doPost(e) {
   }
 
   try {
-    var data = JSON.parse(e.postData.contents);
     var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = spreadsheet.getSheetByName("Rezerwacje") || spreadsheet.getActiveSheet();
     var tz = spreadsheet.getSpreadsheetTimeZone() || "Europe/Warsaw";
@@ -133,18 +180,23 @@ function doPost(e) {
 
     // Zapisujemy rezerwację do arkusza z prefiksem apostrofu
     sheet.appendRow([
-      "'" + requestedDate,
-      data.dateDisplay,
-      "'" + requestedTime,
-      data.serviceType,
-      data.location,
-      data.firstName,
-      data.lastName,
-      data.clientEmail,
-      data.dogName,
-      data.dogAge,
-      data.dogGender,
-      Utilities.formatDate(new Date(), tz, "yyyy-MM-dd HH:mm:ss")
+      "'" + requestedDate,                                   // 1  Data (YYYY-MM-DD)
+      data.dateDisplay,                                      // 2  Data słownie
+      "'" + requestedTime,                                   // 3  Godzina
+      data.serviceType,                                      // 4  Rodzaj zajęć
+      data.location,                                         // 5  Lokalizacja
+      data.firstName,                                        // 6  Imię opiekuna
+      data.lastName,                                         // 7  Nazwisko opiekuna
+      data.clientEmail,                                      // 8  E-mail
+      data.clientPhone,                                      // 9  Telefon opiekuna
+      data.dogName,                                          // 10 Imię psa
+      data.dogAge,                                           // 11 Wiek psa
+      data.dogGender,                                        // 12 Płeć psa
+      data.dogSociability,                                   // 13 Reakcja na inne psy
+      data.dogNotes,                                         // 14 Uwagi o psie
+      data.healthConfirm ? 'TAK' : 'NIE',                     // 15 Zdrowie i szczepienia
+      data.rodoConsent ? 'TAK' : 'NIE',                       // 16 Zgoda RODO
+      Utilities.formatDate(new Date(), tz, "yyyy-MM-dd HH:mm:ss") // 17 Data utworzenia wpisu
     ]);
 
     // Tworzenie wydarzenia w Kalendarzu Google
@@ -167,7 +219,10 @@ function doPost(e) {
       var eventDescription = '🐶 Rezerwacja zajęć PsiApsi\n\n' +
                              '👤 Klient: ' + data.firstName + ' ' + data.lastName + '\n' +
                              '📧 E-mail: ' + (data.clientEmail || 'Brak') + '\n' +
+                             '📞 Telefon: ' + (data.clientPhone || 'Brak') + '\n' +
                              '🐕 Pies: ' + data.dogName + ' (' + data.dogAge + ' lat, płeć: ' + data.dogGender + ')\n' +
+                             '🐾 Reakcja na inne psy: ' + (data.dogSociability || 'nie podano') + '\n' +
+                             '🩺 Uwagi o psie: ' + (data.dogNotes || 'brak') + '\n' +
                              '🎯 Rodzaj zajęć: ' + data.serviceType + '\n' +
                              '📍 Lokalizacja: ' + eventLocation + '\n' +
                              '📅 Data i godzina: ' + data.dateDisplay + ' o godz. ' + data.timeSlot;
@@ -201,7 +256,16 @@ function doPost(e) {
         MailApp.sendEmail({
           to: data.clientEmail,
           subject: 'Potwierdzenie rezerwacji - PsiApsi',
-          body: 'Cześć ' + data.firstName + '!\n\nTwoja rezerwacja na dzień ' + data.dateDisplay + ' o godz. ' + data.timeSlot + ' (' + data.serviceType + ') w lokalizacji: ' + eventLocation + ' została przyjęta.\n\nPozdrawiamy,\nZespół PsiApsi'
+          body: 'Cześć ' + data.firstName + '!\n\n' +
+                'Twoja rezerwacja została przyjęta.\n\n' +
+                '📅 Termin: ' + data.dateDisplay + ' o godz. ' + data.timeSlot + '\n' +
+                '🎯 Zajęcia: ' + data.serviceType + '\n' +
+                '📍 Miejsce spotkania: ' + eventLocation + '\n' +
+                '🐕 Pies: ' + data.dogName + '\n' +
+                '📞 Kontakt do Ciebie: ' + (data.clientPhone || 'brak') + '\n\n' +
+                'W załączniku zaproszenie do Kalendarza Google. Termin możesz bezpłatnie zmienić ' +
+                'do 24 godzin przed spotkaniem — wystarczy odpowiedź na tego e-maila.\n\n' +
+                'Do zobaczenia na leśnym szlaku!\nZespół PsiApsi'
         });
       }
     } catch (emailErr) {
@@ -220,6 +284,15 @@ function doPost(e) {
 }
 
 function doGet(e) {
+  var params = (e && e.parameter) || {};
+
+  // Zaplecze szkoły: ten sam adres co API, tylko z parametrem ?page=admin
+  if (String(params.page || '').toLowerCase() === 'admin') {
+    return HtmlService.createHtmlOutputFromFile('Admin')
+      .setTitle('PsiApsi — panel')
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+  }
+
   try {
     var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     var bookingsSheet = spreadsheet.getSheetByName("Rezerwacje") || spreadsheet.getActiveSheet();
@@ -251,11 +324,15 @@ function doGet(e) {
     // 3. Pobieramy dynamiczny grafik godzin (zakładka "Grafik")
     var schedule = getScheduleConfig(spreadsheet);
 
+    // 4. Pobieramy opinie opiekunów (zakładka "Opinie")
+    var testimonials = getTestimonialsConfig(spreadsheet);
+
     var response = {
       status: 'success',
       bookedSlots: bookedSlots,
       services: services,
-      schedule: schedule
+      schedule: schedule,
+      testimonials: testimonials
     };
 
     return ContentService.createTextOutput(JSON.stringify(response))
@@ -267,39 +344,12 @@ function doGet(e) {
 }
 
 // ── Odczyt zakładki "Uslugi" ──────────────────────────────────────────
-// Kolumny: Nazwa | Ikona | Opis | Maks. psów | Blokuje slot (TAK/NIE) | Domyślne lokalizacje (oddzielone średnikiem lub przecinkiem)
+// Kolumny: Nazwa | Ikona | Opis | Maks. psów | Indywidualne (TAK/NIE) | Lokalizacje |
+//          Cena | Czas trwania | Co w cenie (oddzielone średnikiem)
 function getServicesConfig(spreadsheet) {
   var sheet = spreadsheet.getSheetByName("Uslugi");
   if (!sheet) {
-    return [
-      {
-        id: "1-1",
-        name: "Spacer 1-1",
-        icon: "🦮",
-        desc: "Indywidualny, 1 pies",
-        maxDogs: 1,
-        is1on1: true,
-        locations: ["Warszawa Wawer (trasy leśne MPK)"]
-      },
-      {
-        id: "grupowy",
-        name: "Spacer grupowy",
-        icon: "🐕‍🦺",
-        desc: "Do 3 psów, socjalizacja",
-        maxDogs: 3,
-        is1on1: false,
-        locations: ["Warszawa Wawer (trasy leśne MPK)"]
-      },
-      {
-        id: "konsultacja",
-        name: "Konsultacja",
-        icon: "🎓",
-        desc: "Behawioralna, diagnoza",
-        maxDogs: 1,
-        is1on1: true,
-        locations: ["Warszawa Wawer (trasy leśne MPK)", "Dojazd do klienta"]
-      }
-    ];
+    return DEFAULT_SERVICES;
   }
 
   var data = sheet.getDataRange().getValues();
@@ -314,7 +364,7 @@ function getServicesConfig(spreadsheet) {
     var maxDogs = parseInt(row[3], 10) || 1;
     var is1on1Val = String(row[4] || '').trim().toUpperCase();
     var is1on1 = (is1on1Val === 'TAK' || is1on1Val === 'TRUE' || is1on1Val === '1' || maxDogs === 1);
-    
+
     var locRaw = String(row[5] || '').trim();
     var locations = [];
     if (locRaw) {
@@ -331,22 +381,134 @@ function getServicesConfig(spreadsheet) {
       desc: desc,
       maxDogs: maxDogs,
       is1on1: is1on1,
-      locations: locations
+      locations: locations,
+      price: String(row[6] || '').trim(),
+      duration: String(row[7] || '').trim(),
+      features: splitList(row[8])
     });
   }
 
-  return services.length > 0 ? services : [
-    {
-      id: "1-1",
-      name: "Spacer 1-1",
-      icon: "🦮",
-      desc: "Indywidualny, 1 pies",
-      maxDogs: 1,
-      is1on1: true,
-      locations: ["Warszawa Wawer (trasy leśne MPK)"]
-    }
-  ];
+  return services.length > 0 ? services : DEFAULT_SERVICES;
 }
+
+// ── Odczyt zakładki "Opinie" ──────────────────────────────────────────
+// Kolumny: Imię | Pies | Treść | Ocena (1-5) | Widoczna (TAK/NIE)
+function getTestimonialsConfig(spreadsheet) {
+  var sheet = spreadsheet.getSheetByName('Opinie');
+  if (!sheet) return [];
+
+  var data = sheet.getDataRange().getValues();
+  var testimonials = [];
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    var author = String(row[0] || '').trim();
+    var text = String(row[2] || '').trim();
+    if (!author || !text) continue;
+
+    var visibleRaw = String(row[4] || '').trim().toUpperCase();
+    var visible = !(visibleRaw === 'NIE' || visibleRaw === 'FALSE' || visibleRaw === '0');
+    if (!visible) continue;
+
+    var rating = parseInt(row[3], 10);
+    if (isNaN(rating) || rating < 1 || rating > 5) rating = 5;
+
+    testimonials.push({
+      author: author,
+      dog: String(row[1] || '').trim(),
+      text: text,
+      rating: rating
+    });
+  }
+  return testimonials;
+}
+
+// Dzieli komórkę na listę (średnik, przecinek lub nowa linia)
+function splitList(value) {
+  var raw = String(value || '').trim();
+  if (!raw) return [];
+  return raw.split(/[;,\n]/).map(function(v) { return v.trim(); }).filter(Boolean);
+}
+
+// ── Usługi zapasowe, gdy zakładka "Uslugi" nie istnieje ────────────────
+// Domyślna oferta psiej szkoły: opiekun ćwiczy razem ze swoim psem.
+var LOC_TRAIL  = 'Warszawa Wawer — trasy leśne';
+var LOC_HALL   = 'Salka treningowa — Warszawa Wawer';
+var LOC_CLIENT = 'Dojazd do klienta';
+
+var DEFAULT_SERVICES = [
+  {
+    id: "spacer-socjalizacyjny",
+    name: "Spacer socjalizacyjny",
+    icon: "🐕‍🦺",
+    desc: "Grupa do 3 psów, leśna trasa",
+    maxDogs: 3,
+    is1on1: false,
+    locations: [LOC_TRAIL],
+    price: "",
+    duration: "",
+    features: []
+  },
+  {
+    id: "posluszenstwo",
+    name: "Grupowe zajęcia posłuszeństwa",
+    icon: "🎯",
+    desc: "Salka, grupa do 4 psów",
+    maxDogs: 4,
+    is1on1: false,
+    locations: [LOC_HALL],
+    price: "",
+    duration: "",
+    features: []
+  },
+  {
+    id: "szczeniaki",
+    name: "Socjalizacja szczeniąt",
+    icon: "🐶",
+    desc: "Salka, grupa do 4 szczeniąt",
+    maxDogs: 4,
+    is1on1: false,
+    locations: [LOC_HALL],
+    price: "",
+    duration: "",
+    features: []
+  },
+  {
+    id: "indywidualny",
+    name: "Trening indywidualny 1-1",
+    icon: "🎓",
+    desc: "Salka, Ty i Twój pies",
+    maxDogs: 1,
+    is1on1: true,
+    locations: [LOC_HALL],
+    price: "",
+    duration: "",
+    features: []
+  },
+  {
+    id: "lekliwe",
+    name: "Psy lękliwe i reaktywne",
+    icon: "🧘",
+    desc: "Mała grupa do 2 psów",
+    maxDogs: 2,
+    is1on1: false,
+    locations: [LOC_HALL, LOC_TRAIL],
+    price: "",
+    duration: "",
+    features: []
+  },
+  {
+    id: "konsultacja",
+    name: "Konsultacja behawioralna",
+    icon: "📋",
+    desc: "Diagnoza i plan pracy",
+    maxDogs: 1,
+    is1on1: true,
+    locations: [LOC_CLIENT],
+    price: "",
+    duration: "",
+    features: []
+  }
+];
 
 // ── Odczyt zakładki "Grafik" ──────────────────────────────────────────
 // Kolumny: Dzień tygodnia (Poniedziałek / YYYY-MM-DD) | Dostępne godziny (np. "18:00, 19:00, 20:00")
@@ -437,4 +599,478 @@ function normalizeTime(str) {
     return h + ':' + match[2];
   }
   return str;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// PANEL ADMINISTRATORA
+// Strona pod tym samym adresem co API: …/exec?page=admin
+// Panel pisze do zakładek Grafik i Uslugi, pokazuje zapisy i pozwala je
+// odwołać. Dostęp chroni PIN z właściwości skryptu (ADMIN_PIN), opcjonalnie
+// dodatkowo sprawdzany jest adres zalogowanego konta (ADMIN_EMAIL).
+// ══════════════════════════════════════════════════════════════════════
+
+var ADMIN_DAY_NAMES = ['Poniedziałek', 'Wtorek', 'Środa', 'Czwartek', 'Piątek', 'Sobota', 'Niedziela'];
+var ADMIN_TIME_RE   = /^([01]\d|2[0-3]):[0-5]\d$/;
+var ADMIN_DATE_RE   = /^\d{4}-\d{2}-\d{2}$/;
+// CacheService trzyma wpisy maksymalnie 6 godzin — dłuższa sesja i tak by nie przetrwała.
+var ADMIN_SESSION_SECONDS = 6 * 60 * 60;
+
+var ADMIN_DIACRITICS = { 'ą': 'a', 'ć': 'c', 'ę': 'e', 'ł': 'l', 'ń': 'n', 'ó': 'o', 'ś': 's', 'ź': 'z', 'ż': 'z' };
+
+function adminNormalizeKey_(text) {
+  return String(text || '').toLowerCase().replace(/[ąćęłńóśźż]/g, function (ch) {
+    return ADMIN_DIACRITICS[ch] || ch;
+  });
+}
+
+function adminWeekdayIndex_(key) {
+  var normalized = adminNormalizeKey_(key);
+  for (var i = 0; i < ADMIN_DAY_NAMES.length; i++) {
+    if (adminNormalizeKey_(ADMIN_DAY_NAMES[i]) === normalized) return i;
+  }
+  return -1;
+}
+
+function adminMinutes_(hour) {
+  var parts = String(hour || '').split(':');
+  return (parseInt(parts[0], 10) || 0) * 60 + (parseInt(parts[1], 10) || 0);
+}
+
+// "18:00, 19:30" → ['18:00', '19:30'] — posortowane, bez duplikatów i śmieci
+function adminParseHours_(value) {
+  var raw = String(value || '').trim();
+  if (!raw) return [];
+
+  var seen = {};
+  var out = [];
+  raw.split(/[;,]/).forEach(function (chunk) {
+    var hour = normalizeTime(String(chunk).trim());
+    if (!ADMIN_TIME_RE.test(hour) || seen[hour]) return;
+    seen[hour] = true;
+    out.push(hour);
+  });
+  out.sort(function (a, b) { return adminMinutes_(a) - adminMinutes_(b); });
+  return out;
+}
+
+// Lista godzin przysłana z panelu → posortowana, poprawna lista (albo [])
+function adminCleanHours_(list) {
+  if (!list || !list.length) return [];
+  return adminParseHours_(list.join(','));
+}
+
+// ── Dostęp ─────────────────────────────────────────────────────────────
+
+function adminProps_() {
+  return PropertiesService.getScriptProperties();
+}
+
+function adminPin_() {
+  return String(adminProps_().getProperty('ADMIN_PIN') || '').trim();
+}
+
+function adminAllowedEmail_() {
+  return String(adminProps_().getProperty('ADMIN_EMAIL') || '').trim().toLowerCase();
+}
+
+// Adres osoby otwierającej panel. Przy zwykłym Gmailu bywa pusty —
+// wtedy zostaje sam PIN, dlatego nie wymagamy go do działania panelu.
+function adminVisitorEmail_() {
+  try {
+    return String(Session.getActiveUser().getEmail() || '').trim().toLowerCase();
+  } catch (err) {
+    return '';
+  }
+}
+
+function adminSessionKey_(token) {
+  return 'admin_session_' + String(token || '');
+}
+
+// Sprawdza PIN i wydaje krótkotrwały token sesji (PIN nie jest zapisywany na urządzeniu).
+function adminAuth(pin) {
+  var expected = adminPin_();
+  if (!expected) {
+    return {
+      status: 'error',
+      code: 'no-pin',
+      message: 'Panel nie ma jeszcze PIN-u. Dodaj właściwość skryptu ADMIN_PIN (Ustawienia projektu → Właściwości skryptu) i wdróż nową wersję.'
+    };
+  }
+
+  if (String(pin || '').trim() !== expected) {
+    return { status: 'error', code: 'bad-pin', message: 'Nieprawidłowy PIN.' };
+  }
+
+  var allowed = adminAllowedEmail_();
+  var visitor = adminVisitorEmail_();
+  if (allowed && visitor && visitor !== allowed) {
+    return { status: 'error', code: 'bad-user', message: 'To konto Google nie ma dostępu do panelu.' };
+  }
+
+  var token = Utilities.getUuid();
+  CacheService.getScriptCache().put(adminSessionKey_(token), '1', ADMIN_SESSION_SECONDS);
+
+  return { status: 'success', token: token, email: visitor };
+}
+
+// Jednorazowa pomoc: uruchom tę funkcję z edytora Apps Script, żeby ustawić PIN.
+function ustawPinAdmina() {
+  var pin = String(Browser.inputBox('Nowy PIN panelu (co najmniej 4 znaki):') || '').trim();
+  if (pin.length < 4) {
+    Browser.msgBox('PIN musi mieć co najmniej 4 znaki. Nic nie zmieniono.');
+    return;
+  }
+  adminProps_().setProperty('ADMIN_PIN', pin);
+  Browser.msgBox('PIN zapisany. Wdróż nową wersję wdrożenia (Wdróż → Zarządzaj wdrożeniami → Edytuj → Nowa wersja).');
+}
+
+function adminCheckAuth_(req) {
+  var token = req && req.token;
+  var expired = { status: 'error', code: 'auth', message: 'Sesja wygasła — zaloguj się ponownie.' };
+
+  if (!token) return expired;
+  if (!CacheService.getScriptCache().get(adminSessionKey_(token))) return expired;
+
+  return null;
+}
+
+// Jedyny punkt wejścia panelu — wołany z przeglądarki przez google.script.run.
+function adminApi(req) {
+  req = req || {};
+
+  var authError = adminCheckAuth_(req);
+  if (authError) return authError;
+
+  try {
+    var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+
+    switch (req.action) {
+      case 'grafik':        return adminGetGrafik_(spreadsheet);
+      case 'saveGrafik':    return adminSaveGrafik_(spreadsheet, req.payload || {});
+      case 'uslugi':        return adminGetUslugi_(spreadsheet);
+      case 'saveUslugi':    return adminSaveUslugi_(spreadsheet, req.payload || {});
+      case 'rezerwacje':    return adminGetRezerwacje_(spreadsheet, req.payload || {});
+      case 'cancelBooking': return adminCancelBooking_(spreadsheet, req.payload || {});
+      default:              return { status: 'error', message: 'Nieznana akcja: ' + req.action };
+    }
+  } catch (err) {
+    Logger.log('adminApi: ' + err);
+    return { status: 'error', message: 'Błąd serwera: ' + err.toString() };
+  }
+}
+
+// ── Grafik ─────────────────────────────────────────────────────────────
+
+// Zwraca grafik w formie wygodnej dla panelu:
+//   default   — godziny domyślne (fallback dla dni bez własnego wpisu)
+//   weekdays  — wpisy dni tygodnia; BRAK klucza = dzień dziedziczy domyślne
+//   dates     — wyjątki na konkretną datę (pusta lista = dzień wolny)
+//   extraRows — wiersze, których panel nie rozumie (przepisujemy je bez zmian)
+function adminGetGrafik_(spreadsheet) {
+  var result = { status: 'success', default: ['18:00', '19:00', '20:00'], weekdays: {}, dates: [], extraRows: [] };
+  var sheet = spreadsheet.getSheetByName('Grafik');
+  if (!sheet) return result;
+
+  var tz = spreadsheet.getSpreadsheetTimeZone() || 'Europe/Warsaw';
+  var data = sheet.getDataRange().getValues();
+
+  for (var i = 1; i < data.length; i++) {
+    var rawKey = data[i][0];
+    if (rawKey === undefined || rawKey === null || String(rawKey).trim() === '') continue;
+
+    var rawHours = String(data[i][1] || '').trim();
+    var hours = adminParseHours_(rawHours);
+    var isDateCell = (rawKey instanceof Date)
+      || (typeof rawKey === 'object' && typeof rawKey.getTime === 'function')
+      || ADMIN_DATE_RE.test(String(rawKey).trim());
+    var key = isDateCell ? formatSheetDate(rawKey, tz) : String(rawKey).trim().toLowerCase();
+
+    if (key === 'domyślne' || key === 'domyslne' || key === 'default') {
+      if (hours.length > 0) result.default = hours;
+      continue;
+    }
+
+    var weekdayIndex = adminWeekdayIndex_(key);
+    if (weekdayIndex !== -1) {
+      result.weekdays[ADMIN_DAY_NAMES[weekdayIndex].toLowerCase()] = hours;
+      continue;
+    }
+
+    if (isDateCell && ADMIN_DATE_RE.test(key)) {
+      result.dates.push({ date: key, hours: hours });
+      continue;
+    }
+
+    result.extraRows.push([String(rawKey), rawHours]);
+  }
+
+  result.dates.sort(function (a, b) { return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0); });
+  return result;
+}
+
+function adminSaveGrafik_(spreadsheet, payload) {
+  var defaultHours = adminCleanHours_(payload.default);
+  if (defaultHours.length === 0) {
+    return {
+      status: 'error',
+      code: 'validation',
+      message: 'Godziny domyślne nie mogą być puste. Zostaw przynajmniej jedną albo oznacz wszystkie dni tygodnia osobno.'
+    };
+  }
+
+  // Dzień z wpisem (własne godziny lub „wolne”) albo bez wpisu (dziedziczy domyślne).
+  var weekdayRows = [];
+  var weekdays = payload.weekdays || {};
+  for (var i = 0; i < ADMIN_DAY_NAMES.length; i++) {
+    var name = ADMIN_DAY_NAMES[i];
+    var key = name.toLowerCase();
+    if (!Object.prototype.hasOwnProperty.call(weekdays, key)) continue;
+    weekdayRows.push([name, adminCleanHours_(weekdays[key]).join(', ')]);
+  }
+
+  var dateRows = [];
+  var seenDates = {};
+  (payload.dates || []).forEach(function (entry) {
+    var date = String((entry && entry.date) || '').trim();
+    if (!ADMIN_DATE_RE.test(date) || seenDates[date]) return;
+    seenDates[date] = true;
+    dateRows.push([date, adminCleanHours_(entry.hours).join(', ')]);
+  });
+  dateRows.sort(function (a, b) { return a[0] < b[0] ? -1 : 1; });
+
+  var extraRows = (payload.extraRows || []).filter(function (row) {
+    return row && String(row[0] || '').trim() !== '';
+  });
+
+  return adminWithLock_(function () {
+    var sheet = spreadsheet.getSheetByName('Grafik') || spreadsheet.insertSheet('Grafik');
+    sheet.clearContents();
+    sheet.getRange(1, 1, 1, 2).setValues([['Dzień / Data', 'Godziny (oddzielone przecinkiem)']]);
+
+    var rows = [['Domyślne', defaultHours.join(', ')]].concat(weekdayRows, dateRows, extraRows);
+    sheet.getRange(2, 1, rows.length, 2).setValues(rows);
+
+    return { status: 'success', rows: rows.length };
+  });
+}
+
+// ── Oferta (zakładka Uslugi) ───────────────────────────────────────────
+
+function adminGetUslugi_(spreadsheet) {
+  var sheet = spreadsheet.getSheetByName('Uslugi');
+  var services = getServicesConfig(spreadsheet);
+  var list = [];
+
+  for (var i = 0; i < services.length; i++) {
+    var s = services[i];
+    list.push({
+      name: s.name,
+      icon: s.icon,
+      desc: s.desc,
+      maxDogs: s.maxDogs,
+      is1on1: s.is1on1,
+      locations: s.locations,
+      price: s.price,
+      duration: s.duration,
+      features: s.features
+    });
+  }
+
+  return { status: 'success', exists: !!sheet, services: list };
+}
+
+function adminSaveUslugi_(spreadsheet, payload) {
+  var list = payload.services || [];
+  if (!list.length) {
+    return { status: 'error', code: 'validation', message: 'Potrzebujesz przynajmniej jednego rodzaju zajęć.' };
+  }
+
+  var rows = [];
+  var seen = {};
+
+  for (var i = 0; i < list.length; i++) {
+    var item = list[i] || {};
+    var name = String(item.name || '').trim();
+    if (!name) {
+      return { status: 'error', code: 'validation', message: 'Zajęcia nr ' + (i + 1) + ' nie mają nazwy.' };
+    }
+
+    // Dopasowanie slotów działa po nazwie, więc nazwy muszą być unikalne.
+    var normalizedName = adminNormalizeKey_(name);
+    if (seen[normalizedName]) {
+      return { status: 'error', code: 'validation', message: 'Nazwy zajęć muszą być unikalne — „' + name + '” powtarza się.' };
+    }
+    seen[normalizedName] = true;
+
+    var locations = (item.locations || []).map(function (loc) {
+      return String(loc || '').trim();
+    }).filter(Boolean);
+    if (!locations.length) {
+      return { status: 'error', code: 'validation', message: 'Zajęcia „' + name + '” nie mają żadnego miejsca spotkania.' };
+    }
+
+    var maxDogs = parseInt(item.maxDogs, 10);
+    if (isNaN(maxDogs) || maxDogs < 1) maxDogs = 1;
+    var is1on1 = item.is1on1 === true || String(item.is1on1).toUpperCase() === 'TAK' || maxDogs === 1;
+
+    rows.push([
+      name,
+      String(item.icon || '').trim() || '🐾',
+      String(item.desc || '').trim(),
+      maxDogs,
+      is1on1 ? 'TAK' : 'NIE',
+      locations.join('; '),
+      String(item.price || '').trim(),
+      String(item.duration || '').trim(),
+      (item.features || []).map(function (f) { return String(f || '').trim(); }).filter(Boolean).join('; ')
+    ]);
+  }
+
+  return adminWithLock_(function () {
+    var sheet = spreadsheet.getSheetByName('Uslugi') || spreadsheet.insertSheet('Uslugi');
+    sheet.clearContents();
+    sheet.getRange(1, 1, 1, 9).setValues([[
+      'Nazwa', 'Ikona', 'Opis', 'Maks psów', 'Indywidualne',
+      'Lokalizacje (; )', 'Cena', 'Czas trwania', 'Co w cenie (; )'
+    ]]);
+    sheet.getRange(2, 1, rows.length, 9).setValues(rows);
+
+    return { status: 'success', count: rows.length };
+  });
+}
+
+// ── Zapisy ─────────────────────────────────────────────────────────────
+
+function adminGetRezerwacje_(spreadsheet, payload) {
+  var sheet = spreadsheet.getSheetByName('Rezerwacje') || spreadsheet.getActiveSheet();
+  var tz = spreadsheet.getSpreadsheetTimeZone() || 'Europe/Warsaw';
+  var data = sheet.getDataRange().getValues();
+  var from = String(payload.from || '').trim();
+  var to = String(payload.to || '').trim();
+  var bookings = [];
+
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    var date = formatSheetDate(row[0], tz);
+    var time = formatSheetTime(row[2], tz);
+    if (!date || !time) continue;
+    if (from && date < from) continue;
+    if (to && date > to) continue;
+
+    bookings.push({
+      row: i + 1,
+      date: date,
+      time: time,
+      service: String(row[3] || '').trim(),
+      location: String(row[4] || '').trim(),
+      firstName: String(row[5] || '').trim(),
+      lastName: String(row[6] || '').trim(),
+      email: String(row[7] || '').trim(),
+      phone: String(row[8] || '').trim(),
+      dogName: String(row[9] || '').trim(),
+      dogAge: String(row[10] || '').trim(),
+      dogGender: String(row[11] || '').trim(),
+      sociability: String(row[12] || '').trim(),
+      notes: String(row[13] || '').trim(),
+      health: String(row[14] || '').trim(),
+      created: row[16] ? Utilities.formatDate(new Date(row[16]), tz, 'yyyy-MM-dd HH:mm') : ''
+    });
+  }
+
+  bookings.sort(function (a, b) {
+    if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+    return adminMinutes_(a.time) - adminMinutes_(b.time);
+  });
+
+  return { status: 'success', bookings: bookings };
+}
+
+function adminCancelBooking_(spreadsheet, payload) {
+  var rowNumber = parseInt(payload.row, 10);
+  if (!rowNumber || rowNumber < 2) {
+    return { status: 'error', code: 'validation', message: 'Nieprawidłowy wiersz rezerwacji.' };
+  }
+
+  return adminWithLock_(function () {
+    var sheet = spreadsheet.getSheetByName('Rezerwacje') || spreadsheet.getActiveSheet();
+    var tz = spreadsheet.getSpreadsheetTimeZone() || 'Europe/Warsaw';
+
+    if (rowNumber > sheet.getLastRow()) {
+      return { status: 'error', message: 'Ten zapis już nie istnieje — odśwież listę.' };
+    }
+
+    var values = sheet.getRange(rowNumber, 1, 1, 17).getValues()[0];
+    var date = formatSheetDate(values[0], tz);
+    var time = formatSheetTime(values[2], tz);
+    var dogName = String(values[9] || '').trim();
+
+    // Zabezpieczenie przed usunięciem niewłaściwego wiersza, gdy lista się przesunie.
+    if (payload.date && date !== String(payload.date).trim()) {
+      return { status: 'error', message: 'Lista się zmieniła — odśwież zapisy i spróbuj ponownie.' };
+    }
+    if (payload.time && time !== normalizeTime(String(payload.time).trim())) {
+      return { status: 'error', message: 'Lista się zmieniła — odśwież zapisy i spróbuj ponownie.' };
+    }
+
+    sheet.deleteRow(rowNumber);
+
+    // Wydarzenie w Kalendarzu Google usuwamy „best effort” — brak wpisu nie może
+    // zablokować odwołania rezerwacji w arkuszu.
+    var calendarRemoved = false;
+    try {
+      calendarRemoved = adminRemoveCalendarEvent_(date, time, dogName);
+    } catch (calErr) {
+      Logger.log('Błąd usuwania wydarzenia: ' + calErr);
+    }
+
+    try {
+      logStat_('rezerwacja_odwolana', date + ' ' + time + ' · ' + (values[3] || '') + ' · ' + dogName);
+    } catch (logErr) {
+      Logger.log('Błąd zapisu statystyki: ' + logErr);
+    }
+
+    return { status: 'success', row: rowNumber, calendarRemoved: calendarRemoved };
+  });
+}
+
+// Szuka w Kalendarzu wydarzenia tej rezerwacji (data + godzina + imię psa).
+function adminRemoveCalendarEvent_(date, time, dogName) {
+  if (!ADMIN_DATE_RE.test(date) || !dogName) return false;
+
+  var parts = date.split('-');
+  var day = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+  var events = CalendarApp.getDefaultCalendar().getEventsForDay(day);
+
+  for (var i = 0; i < events.length; i++) {
+    var title = String(events[i].getTitle() || '');
+    if (title.indexOf('PsiApsi:') !== 0) continue;
+    if (title.indexOf('(' + dogName + ')') === -1) continue;
+
+    var start = events[i].getStartTime();
+    var eventTime = normalizeTime(start.getHours() + ':' + start.getMinutes());
+    if (adminMinutes_(eventTime) !== adminMinutes_(time)) continue;
+
+    events[i].deleteEvent();
+    return true;
+  }
+
+  return false;
+}
+
+// Wspólna blokada zapisu — dwie osoby klikające „Zapisz” naraz nie mogą
+// nadpisać swoich zmian w połowie.
+function adminWithLock_(fn) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+  } catch (err) {
+    return { status: 'error', message: 'Serwer był zajęty. Spróbuj ponownie.' };
+  }
+
+  try {
+    return fn();
+  } finally {
+    lock.releaseLock();
+  }
 }

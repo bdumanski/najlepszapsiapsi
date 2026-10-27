@@ -8,34 +8,67 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby3JNKKwOicbrz1
 const dayNames      = ['Poniedziałek','Wtorek','Środa','Czwartek','Piątek','Sobota','Niedziela'];
 const shortDayNames = ['Pn','Wt','Śr','Cz','Pt','Sb','Nd'];
 
-// Domyślne wartości zapasowe (nadpisywane danymi z Arkusza Google)
+// Miejsce spotkania — używane w domyślnej ofercie zapasowej
+const LOC_TRAIL  = 'Warszawa Wawer — trasy leśne';
+const LOC_HALL   = 'Salka treningowa — Warszawa Wawer';
+const LOC_CLIENT = 'Dojazd do klienta';
+
+// Domyślna oferta szkoły (nadpisywana danymi z zakładki "Uslugi").
+// To psia szkoła: opiekun ćwiczy razem ze swoim psem.
 let availableServices = [
   {
-    id: "1-1",
-    name: "Spacer 1-1",
-    icon: "🦮",
-    desc: "Indywidualny, 1 pies",
-    maxDogs: 1,
-    is1on1: true,
-    locations: ["Warszawa Wawer (trasy leśne MPK)"]
-  },
-  {
-    id: "grupowy",
-    name: "Spacer grupowy",
+    id: "spacer-socjalizacyjny",
+    name: "Spacer socjalizacyjny",
     icon: "🐕‍🦺",
-    desc: "Do 3 psów, socjalizacja",
+    desc: "Grupa do 3 psów, leśna trasa",
     maxDogs: 3,
     is1on1: false,
-    locations: ["Warszawa Wawer (trasy leśne MPK)"]
+    locations: [LOC_TRAIL]
+  },
+  {
+    id: "posluszenstwo",
+    name: "Grupowe zajęcia posłuszeństwa",
+    icon: "🎯",
+    desc: "Salka, grupa do 4 psów",
+    maxDogs: 4,
+    is1on1: false,
+    locations: [LOC_HALL]
+  },
+  {
+    id: "szczeniaki",
+    name: "Socjalizacja szczeniąt",
+    icon: "🐶",
+    desc: "Salka, grupa do 4 szczeniąt",
+    maxDogs: 4,
+    is1on1: false,
+    locations: [LOC_HALL]
+  },
+  {
+    id: "indywidualny",
+    name: "Trening indywidualny 1-1",
+    icon: "🎓",
+    desc: "Salka, Ty i Twój pies",
+    maxDogs: 1,
+    is1on1: true,
+    locations: [LOC_HALL]
+  },
+  {
+    id: "lekliwe",
+    name: "Psy lękliwe i reaktywne",
+    icon: "🧘",
+    desc: "Mała grupa do 2 psów",
+    maxDogs: 2,
+    is1on1: false,
+    locations: [LOC_HALL, LOC_TRAIL]
   },
   {
     id: "konsultacja",
-    name: "Konsultacja",
-    icon: "🎓",
-    desc: "Behawioralna, diagnoza",
+    name: "Konsultacja behawioralna",
+    icon: "📋",
+    desc: "Diagnoza i plan pracy",
     maxDogs: 1,
     is1on1: true,
-    locations: ["Warszawa Wawer (trasy leśne MPK)", "Dojazd do klienta"]
+    locations: [LOC_CLIENT]
   }
 ];
 
@@ -47,7 +80,7 @@ let scheduleConfig = {
 // ── Stan aplikacji ──────────────────────────────────────────
 let currentMonday        = getMonday(new Date());
 let bookedData           = [];
-let selectedService      = 'Spacer 1-1';
+let selectedService      = 'Spacer socjalizacyjny';
 let selectedGender       = 'pies';
 let selectedDateStr      = '';
 let selectedHour         = '';
@@ -61,6 +94,7 @@ const studioGrid         = document.getElementById('studioGrid');
 const prevWeekBtn        = document.getElementById('prevWeekBtn');
 const nextWeekBtn        = document.getElementById('nextWeekBtn');
 const todayJumpBtn       = document.getElementById('todayJumpBtn');
+const nextFreeBtn        = document.getElementById('nextFreeBtn');
 const mobileDaysStrip    = document.getElementById('mobileDaysStrip');
 const mobileDayBannerTitle = document.getElementById('mobileDayBannerTitle');
 const mobilePrevDayBtn   = document.getElementById('mobilePrevDayBtn');
@@ -78,6 +112,31 @@ const selectedSummaryText = document.getElementById('selectedSummaryText');
 const changeSelectionBtn = document.getElementById('changeSelectionBtn');
 const modalSummaryDetails = document.getElementById('modalSummaryDetails');
 const closeModalBtn      = document.getElementById('closeModalBtn');
+const priceGrid          = document.getElementById('priceGrid');
+const testimonialGrid    = document.getElementById('testimonialGrid');
+const opinieSection      = document.getElementById('opinie');
+const menuToggle         = document.getElementById('menuToggle');
+const siteHeader         = document.querySelector('.s-header');
+const addToCalendarBtn   = document.getElementById('addToCalendarBtn');
+const anotherBookingBtn  = document.getElementById('anotherBookingBtn');
+const clientPhoneInput   = document.getElementById('clientPhone');
+const dogSociabilityInput= document.getElementById('dogSociability');
+const dogNotesInput      = document.getElementById('dogNotes');
+const healthConfirmInput = document.getElementById('healthConfirm');
+const rodoConsentInput   = document.getElementById('rodoConsent');
+
+// Ostatnia przyjęta rezerwacja (potrzebna do wygenerowania pliku .ics)
+let lastBooking = null;
+
+// Zabezpiecza dane pochodzące z arkusza i z formularza przed wstrzyknięciem HTML
+function escapeHtml(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 // ── Pomocnicze funkcje dat ──────────────────────────────────
 
@@ -103,6 +162,11 @@ function formatDatePL(d) {
 
 function formatDateFullPL(d) {
   return d.toLocaleDateString('pl-PL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+// Polska nazwa dnia tygodnia (getDay(): 0 = niedziela)
+function getPolishDayName(d) {
+  return dayNames[d.getDay() === 0 ? 6 : d.getDay() - 1];
 }
 
 function normalizeDate(val) {
@@ -169,6 +233,11 @@ try {
   if (cachedServices) availableServices = JSON.parse(cachedServices);
   const cachedSchedule = localStorage.getItem('psiapsi_schedule_cache');
   if (cachedSchedule) scheduleConfig = JSON.parse(cachedSchedule);
+  const cachedBookings = localStorage.getItem('psiapsi_bookings_cache');
+  if (cachedBookings) {
+    const parsedBookings = JSON.parse(cachedBookings);
+    if (Array.isArray(parsedBookings)) bookedData = parsedBookings;
+  }
 } catch (e) {
   // Ignoruj błędy localStorage
 }
@@ -192,6 +261,9 @@ async function fetchBookings() {
           serviceType: String(b.serviceType || '').trim(),
           location:    String(b.location || '').trim()
         }));
+        try {
+          localStorage.setItem('psiapsi_bookings_cache', JSON.stringify(bookedData));
+        } catch (e) {}
       }
 
       // 2. Usługi (jeśli skonfigurowane w arkuszu)
@@ -214,12 +286,16 @@ async function fetchBookings() {
           localStorage.setItem('psiapsi_schedule_cache', JSON.stringify(scheduleConfig));
         } catch (e) {}
       }
+
+      // 4. Opinie opiekunów (sekcja pojawia się tylko, gdy są dane)
+      renderTestimonials(json.testimonials);
     }
   } catch (err) {
     console.error('Błąd pobierania danych z Arkusza:', err);
   }
 
   renderServices();
+  renderPricing();
   renderCalendar();
   updateLocationOptions();
 }
@@ -235,17 +311,30 @@ function renderServices() {
     btn.type = 'button';
     btn.className = 's-service-btn' + (srv.name === selectedService ? ' active' : '');
     btn.dataset.service = srv.name;
+    btn.setAttribute('aria-pressed', srv.name === selectedService ? 'true' : 'false');
+
+    const metaParts = [];
+    if (srv.duration) metaParts.push(srv.duration);
+    if (srv.price)    metaParts.push(srv.price);
 
     btn.innerHTML = `
-      <span class="s-service-icon">${srv.icon || '🐾'}</span>
-      <span class="s-service-name">${srv.name}</span>
-      <span class="s-service-desc">${srv.desc || ''}</span>
+      <span class="s-service-icon">${escapeHtml(srv.icon || '🐾')}</span>
+      <span class="s-service-text">
+        <span class="s-service-name">${escapeHtml(srv.name)}</span>
+        <span class="s-service-desc">${escapeHtml(srv.desc || '')}</span>
+        ${metaParts.length ? `<span class="s-service-meta">${escapeHtml(metaParts.join(' · '))}</span>` : ''}
+      </span>
     `;
 
     btn.addEventListener('click', () => {
+      const changed = selectedService !== srv.name;
       selectedService = srv.name;
-      document.querySelectorAll('.s-service-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
+      if (changed) track('usluga_wybrana', srv.name);
+      document.querySelectorAll('.s-service-btn').forEach(b => {
+        const isActive = b.dataset.service === selectedService;
+        b.classList.toggle('active', isActive);
+        b.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+      });
       if (serviceTypeHidden) serviceTypeHidden.value = selectedService;
       
       // Jeśli wybrany wcześniej slot ma już zapisaną inną usługę, odznacz slot
@@ -267,8 +356,7 @@ function renderServices() {
       // Odśwież podsumowanie jeśli slot był wybrany
       if (selectedDateStr && selectedSummaryText) {
         const d = selectedDayDate || new Date(selectedDateStr);
-        const dayLabel = dayNames[d.getDay() === 0 ? 6 : dayDate.getDay() - 1];
-        selectedSummaryText.textContent = `${dayLabel}, ${formatDatePL(d)} · godz. ${selectedHour} · ${selectedService}`;
+        selectedSummaryText.textContent = `${getPolishDayName(d)}, ${formatDatePL(d)} · godz. ${selectedHour} · ${selectedService}`;
       }
     });
 
@@ -276,6 +364,129 @@ function renderServices() {
   });
 
   if (serviceTypeHidden) serviceTypeHidden.value = selectedService;
+}
+
+// ── Cennik (sekcja #cennik) ─────────────────────────────────
+
+function renderPricing() {
+  if (!priceGrid) return;
+  priceGrid.innerHTML = '';
+
+  availableServices.forEach(srv => {
+    const features = Array.isArray(srv.features) ? srv.features : [];
+    const price    = String(srv.price || '').trim();
+    const duration = String(srv.duration || '').trim();
+
+    const card = document.createElement('article');
+    card.className = 's-price-card';
+    card.innerHTML = `
+      <div class="s-price-head">
+        <span class="s-price-icon">${escapeHtml(srv.icon || '🐾')}</span>
+        <h3 class="s-price-name">${escapeHtml(srv.name)}</h3>
+      </div>
+      <p class="s-price-desc">${escapeHtml(srv.desc || '')}</p>
+      <div class="s-price-value">
+        <span class="s-price-amount${price ? '' : ' s-price-amount--ask'}">${escapeHtml(price || 'Wycena po zapytaniu')}</span>
+        ${duration ? `<span class="s-price-duration">${escapeHtml(duration)}</span>` : ''}
+      </div>
+      ${features.length ? `<ul class="s-price-features">${features.map(f => `<li>${escapeHtml(f)}</li>`).join('')}</ul>` : ''}
+      <button type="button" class="s-price-cta">Wybierz termin</button>
+    `;
+
+    card.querySelector('.s-price-cta').addEventListener('click', () => {
+      const tile = Array.from(document.querySelectorAll('.s-service-btn'))
+        .find(b => b.dataset.service === srv.name);
+      if (tile) tile.click();
+      document.getElementById('step1')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+
+    priceGrid.appendChild(card);
+  });
+}
+
+// ── Opinie opiekunów (sekcja #opinie) ────────────────────────
+
+function renderTestimonials(list) {
+  if (!testimonialGrid || !opinieSection) return;
+
+  const items = Array.isArray(list) ? list : [];
+  if (items.length === 0) {
+    // Bez danych w zakładce "Opinie" sekcja w ogóle się nie pojawia
+    opinieSection.classList.add('s-section--hidden');
+    testimonialGrid.innerHTML = '';
+    return;
+  }
+
+  testimonialGrid.innerHTML = items.map(t => {
+    const rating = Math.min(5, Math.max(1, parseInt(t.rating, 10) || 5));
+    const stars  = '★'.repeat(rating) + '☆'.repeat(5 - rating);
+    return `
+      <figure class="s-testimonial">
+        <div class="s-stars" role="img" aria-label="Ocena ${rating} z 5">${stars}</div>
+        <blockquote class="s-testimonial-text">${escapeHtml(t.text)}</blockquote>
+        <figcaption class="s-testimonial-author">
+          ${escapeHtml(t.author)}${t.dog ? `<span class="s-testimonial-dog"> · ${escapeHtml(t.dog)}</span>` : ''}
+        </figcaption>
+      </figure>
+    `;
+  }).join('');
+
+  opinieSection.classList.remove('s-section--hidden');
+}
+
+// ── Dodawanie terminu do kalendarza (plik .ics) ──────────────
+
+function buildIcs(booking) {
+  const [year, month, day] = booking.date.split('-').map(Number);
+  const [hour, minute]    = booking.hour.split(':').map(Number);
+  const pad = (n) => String(n).padStart(2, '0');
+  const stamp = (d) => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`;
+  const escIcs = (s) => String(s || '').replace(/([,;\\])/g, '\\$1').replace(/\r?\n/g, '\\n');
+
+  const start = new Date(year, month - 1, day, hour, minute, 0);
+  const end   = new Date(start.getTime() + 60 * 60 * 1000);
+
+  return [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Psiapsi//Rezerwacja//PL',
+    'CALSCALE:GREGORIAN',
+    'BEGIN:VEVENT',
+    `UID:psiapsi-${stamp(start)}@psiapsi.pl`,
+    `DTSTAMP:${stamp(new Date())}`,
+    `DTSTART:${stamp(start)}`,
+    `DTEND:${stamp(end)}`,
+    `SUMMARY:${escIcs('Psiapsi: ' + booking.service)}`,
+    `LOCATION:${escIcs(booking.location)}`,
+    `DESCRIPTION:${escIcs(booking.description)}`,
+    'END:VEVENT',
+    'END:VCALENDAR'
+  ].join('\r\n');
+}
+
+function downloadIcs() {
+  if (!lastBooking) return;
+  const href = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(buildIcs(lastBooking));
+  const link = document.createElement('a');
+  link.href = href;
+  link.download = `psiapsi-${lastBooking.date}-${lastBooking.hour.replace(':', '')}.ics`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+// ── Analityka pierwszej strony (bez cookies) ─────────────────
+
+function track(event, detail = '') {
+  try {
+    fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ type: 'track', event, detail: String(detail).slice(0, 200) }),
+      keepalive: true
+    }).catch(() => {});
+  } catch (e) {
+    // Analityka nigdy nie może przerwać rezerwacji
+  }
 }
 
 // ── Aktualizacja listy lokalizacji dla wybranej usługi ────────
@@ -314,7 +525,160 @@ function updateLocationOptions(fixedLocation = null) {
   });
 }
 
+// ── Wspólna logika slotów ────────────────────────────────────
+// Jedno źródło prawdy dla siatki tygodnia i paska dni — wcześniej
+// oba miejsca liczyły dostępność osobno i wyniki się rozjeżdżały.
+
+function timeToMinutes(hour) {
+  const [h, m] = String(hour).split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+
+function compareHours(a, b) {
+  return timeToMinutes(a) - timeToMinutes(b);
+}
+
+function addMinutesToHour(hour, minutes) {
+  const total = (timeToMinutes(hour) + minutes) % 1440;
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+// „60 min”, „1,5 h”, „90” → liczba minut (albo null, gdy nie da się odczytać)
+function parseDurationMinutes(text) {
+  const raw = String(text || '').trim().toLowerCase();
+  if (!raw) return null;
+
+  const hours = raw.match(/(\d+(?:[.,]\d+)?)\s*(?:h|godz)/);
+  if (hours) return Math.round(parseFloat(hours[1].replace(',', '.')) * 60);
+
+  const minutes = raw.match(/(\d+)\s*min/) || raw.match(/^\s*(\d+)\s*$/);
+  if (minutes) return parseInt(minutes[1], 10);
+
+  return null;
+}
+
+function getServiceByName(name) {
+  if (!name) return null;
+  const target = String(name).toLowerCase();
+  return availableServices.find(s => s.name.toLowerCase() === target) || null;
+}
+
+// Zwraca pełny stan jednej godziny w danym dniu.
+function getSlotState(dayDate, dateStr, hour, activeServiceObj) {
+  const inPast     = isSlotInPast(dayDate, hour);
+  const matches    = bookedData.filter(b => b.date === dateStr && b.timeSlot === hour);
+  const groupCount = matches.length;
+
+  let slotService  = '';
+  let slotLocation = '';
+  let slotMaxDogs  = 3;
+
+  if (groupCount > 0) {
+    slotService = matches[0].serviceType || '';
+
+    const slotObj = getServiceByName(slotService);
+    if (slotObj) {
+      slotMaxDogs = slotObj.is1on1 ? 1 : (slotObj.maxDogs || 1);
+    } else {
+      const s = slotService.toLowerCase();
+      slotMaxDogs = (s.includes('1-1') || s.includes('indywidualny') || s.includes('konsultacj')) ? 1 : 3;
+    }
+
+    const bookedWithLoc = matches.find(m => m.location);
+    if (bookedWithLoc) slotLocation = bookedWithLoc.location;
+  }
+
+  const has1on1 = matches.some(m => {
+    const obj = getServiceByName(m.serviceType);
+    if (obj) return obj.is1on1;
+    const s = (m.serviceType || '').toLowerCase();
+    return s.includes('1-1') || s.includes('indywidualny') || s.includes('konsultacj');
+  });
+
+  const sameService = slotService
+    ? (!activeServiceObj || activeServiceObj.name.toLowerCase() === slotService.toLowerCase())
+    : true;
+
+  let state, label;
+  if (inPast) {
+    state = 'past';
+    label = 'termin minął';
+  } else if (has1on1) {
+    state = 'full';
+    label = 'zajęty — zajęcia indywidualne';
+  } else if (groupCount >= slotMaxDogs) {
+    state = 'full';
+    label = 'brak wolnych miejsc';
+  } else if (groupCount > 0 && sameService) {
+    state = 'partial';
+    label = `zajęte ${groupCount} z ${slotMaxDogs} miejsc — można dołączyć`;
+  } else if (groupCount > 0) {
+    state = 'full';
+    label = `zajęty — trwają inne zajęcia (${slotService})`;
+  } else {
+    state = 'free';
+    label = 'wolny termin';
+  }
+
+  // Godzina zakończenia liczona z „Czas trwania” wybranych zajęć
+  const durationSource = groupCount > 0 ? (getServiceByName(slotService) || activeServiceObj) : activeServiceObj;
+  const durationMin    = durationSource ? parseDurationMinutes(durationSource.duration) : null;
+
+  return {
+    state,
+    label,
+    groupCount,
+    maxDogs: slotMaxDogs,
+    service: groupCount > 0 ? slotService : (activeServiceObj ? activeServiceObj.name : ''),
+    location: slotLocation,
+    endTime: (state !== 'past' && durationMin) ? addMinutesToHour(hour, durationMin) : ''
+  };
+}
+
 // ── Renderowanie kalendarza (Krok 2) ──────────────────────────
+
+// Buduje pojedynczy przycisk terminu
+function buildSlot(day, hour, rowIndex, activeServiceObj) {
+  const info       = getSlotState(day.date, day.dateStr, hour, activeServiceObj);
+  const isSelected = (day.dateStr === selectedDateStr && hour === selectedHour);
+  const blocked    = info.state === 'past' || info.state === 'full';
+
+  const btn = document.createElement('button');
+  btn.type      = 'button';
+  btn.className = 's-slot-btn is-' + info.state + (isSelected ? ' is-selected' : '');
+  btn.dataset.row  = String(rowIndex);
+  btn.dataset.col  = String(day.index);
+  btn.dataset.hour = hour;
+  btn.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+
+  // Drugi wiersz tylko wtedy, gdy niesie informację: licznik miejsc albo godzina końca.
+  let sub = '';
+  if (info.state === 'partial') {
+    sub = `<span class="s-slot-count">${info.groupCount}/${info.maxDogs}</span>`;
+  } else if (info.endTime) {
+    sub = `<span class="s-slot-end">do ${escapeHtml(info.endTime)}</span>`;
+  }
+
+  btn.innerHTML = `
+    <span class="s-slot-time">${escapeHtml(hour)}</span>
+    ${sub}
+  `;
+
+  const dayLabel  = `${getPolishDayName(day.date)} ${formatDatePL(day.date)}`;
+  const timeLabel = info.endTime ? `${hour}–${info.endTime}` : hour;
+  btn.setAttribute('aria-label', escapeHtml(`${dayLabel}, godz. ${timeLabel} — ${info.label}`));
+
+  if (blocked) {
+    btn.disabled = true;
+    btn.setAttribute('aria-disabled', 'true');
+  } else {
+    btn.addEventListener('click', () => selectSlot(day.date, day.index, hour, info));
+  }
+
+  return btn;
+}
 
 function renderCalendar() {
   if (!studioGrid) return;
@@ -326,171 +690,235 @@ function renderCalendar() {
     weekRangeLabel.textContent = `${formatDatePL(currentMonday)} – ${formatDatePL(sunday)} ${sunday.getFullYear()}`;
   }
 
-  if (prevWeekBtn) {
-    prevWeekBtn.disabled = currentMonday <= getMonday(new Date());
+  // Nie ma po co cofać się przed bieżący tydzień
+  if (prevWeekBtn) prevWeekBtn.disabled = currentMonday <= getMonday(new Date());
+
+  const activeServiceObj = getServiceByName(selectedService);
+
+  const days = [];
+  for (let i = 0; i < 7; i++) {
+    const dayDate = new Date(currentMonday);
+    dayDate.setDate(dayDate.getDate() + i);
+    days.push({
+      index:   i,
+      date:    dayDate,
+      dateStr: formatDateISO(dayDate),
+      today:   isToday(dayDate),
+      hours:   getHoursForDay(dayDate, i).slice().sort(compareHours)
+    });
   }
 
+  // Kolumny są zbite: dzień pokazuje tylko swoje godziny, bez pustych
+  // wypełniaczy rozciągających siatkę w pionie. Gdy dni mają wspólny grafik
+  // (najczęstszy przypadek), godziny i tak układają się w jednej linii.
   studioGrid.innerHTML = '';
 
-  // Pobieramy limity psów dla usług grupowych
-  const groupServiceObj = availableServices.find(s => !s.is1on1) || { maxDogs: 3 };
-  const maxGroupDogs = groupServiceObj.maxDogs || 3;
-
-  const activeServiceObj = availableServices.find(s => s.name === selectedService);
-  const isSelecting1on1 = activeServiceObj ? activeServiceObj.is1on1 : false;
-
-  for (let i = 0; i < 7; i++) {
-    const dayDate    = new Date(currentMonday);
-    dayDate.setDate(dayDate.getDate() + i);
-    const dateStr    = formatDateISO(dayDate);
-    const todayFlag  = isToday(dayDate);
-    const isMobActive = (i === selectedMobileDayIndex);
-
+  days.forEach(day => {
     const col = document.createElement('div');
     col.className = 's-day-col'
-      + (todayFlag   ? ' is-today'         : '')
-      + (isMobActive ? ' is-mobile-active'  : '');
-    col.dataset.dayIndex = i;
+      + (day.today ? ' is-today' : '')
+      + (day.index === selectedMobileDayIndex ? ' is-mobile-active' : '')
+      + (day.hours.length === 0 ? ' is-off' : '');
+    col.dataset.dayIndex = day.index;
 
     const hdr = document.createElement('div');
     hdr.className = 's-day-col-header';
     hdr.innerHTML = `
-      <span class="s-day-col-name">${shortDayNames[i]}</span>
-      <span class="s-day-col-num">${dayDate.getDate()}</span>
+      <span class="s-day-col-name">${shortDayNames[day.index]}</span>
+      <span class="s-day-col-num">${day.date.getDate()}</span>
     `;
     col.appendChild(hdr);
 
-    const hoursForThisDay = getHoursForDay(dayDate, i);
-
-    if (hoursForThisDay.length === 0) {
-      const offLabel = document.createElement('div');
-      offLabel.style.cssText = 'padding:1rem .3rem;font-size:.75rem;color:#9CA3AF;text-align:center;';
-      offLabel.textContent = 'Brak terminów';
-      col.appendChild(offLabel);
+    if (day.hours.length === 0) {
+      // Dzień bez terminów — jedna kreska zamiast pustej kolumny
+      const off = document.createElement('span');
+      off.className = 's-slot-empty';
+      off.setAttribute('aria-hidden', 'true');
+      off.textContent = '—';
+      col.appendChild(off);
     } else {
-      hoursForThisDay.forEach(hour => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 's-slot-btn';
-
-        const inPast  = isSlotInPast(dayDate, hour);
-        const matches = bookedData.filter(b => b.date === dateStr && b.timeSlot === hour);
-        
-        // Czy w tym slocie jest rezerwacja indywidualna 1-1
-        const has1on1 = matches.some(m => {
-          const s = (m.serviceType || '').toLowerCase();
-          const sObj = availableServices.find(x => x.name.toLowerCase() === s);
-          return sObj ? sObj.is1on1 : (s.includes('1-1') || s.includes('indywidualny') || s.includes('konsultacja'));
-        });
-
-        const groupCount = matches.length;
-        let statusText = '';
-        let isFull     = false;
-
-        // Nazwa i konfiguracja usługi zarezerwowanej w tym slocie
-        let slotService = '';
-        let slotLocation = '';
-        let slotMaxDogs = maxGroupDogs;
-
-        if (groupCount > 0) {
-          slotService = matches[0].serviceType || '';
-          const sObj = availableServices.find(x => x.name.toLowerCase() === slotService.toLowerCase());
-          if (sObj && sObj.maxDogs) slotMaxDogs = sObj.maxDogs;
-
-          const bookedWithLoc = matches.find(m => m.location);
-          if (bookedWithLoc) slotLocation = bookedWithLoc.location;
-        }
-
-        const isSameService = slotService ? (selectedService.toLowerCase() === slotService.toLowerCase()) : true;
-
-        if (inPast) {
-          btn.classList.add('is-past');
-          statusText = 'Minął';
-          btn.disabled = true;
-        } else if (has1on1) {
-          isFull = true;
-          btn.classList.add('is-full');
-          statusText = 'Zajęty (1-1)';
-          btn.disabled = true;
-        } else if (groupCount >= slotMaxDogs) {
-          isFull = true;
-          btn.classList.add('is-full');
-          statusText = 'Brak miejsc';
-          btn.disabled = true;
-        } else if (groupCount > 0) {
-          // Trwa zapis na konkretne zajęcia grupowe
-          const remaining = slotMaxDogs - groupCount;
-
-          if (isSameService) {
-            btn.classList.add('is-partial');
-            statusText = `${slotService} (${groupCount}/${slotMaxDogs}) • wolne: ${remaining}`;
-          } else {
-            // Użytkownik ma zaznaczoną inną usługę (np. inne zajęcia grupowe lub 1-1)
-            btn.classList.add('is-full');
-            statusText = `Zajęty (${slotService})`;
-            isFull = true;
-            btn.disabled = true;
-          }
-        } else {
-          // Slot jest całkowicie pusty
-          btn.classList.add('is-available');
-          statusText = 'Wolny';
-        }
-
-        if (dateStr === selectedDateStr && hour === selectedHour) {
-          btn.classList.add('is-selected');
-        }
-
-        btn.innerHTML = `
-          <span class="s-slot-time">${hour}</span>
-          <span class="s-slot-status">${statusText}</span>
-        `;
-
-        if (!inPast && !isFull) {
-          btn.addEventListener('click', () => selectSlot(dateStr, hour, dayDate, i, groupCount, slotLocation, slotService));
-        }
-
-        col.appendChild(btn);
+      day.hours.forEach((hour, rowIndex) => {
+        col.appendChild(buildSlot(day, hour, rowIndex, activeServiceObj));
       });
     }
 
     studioGrid.appendChild(col);
-  }
+  });
 
+  applyRovingTabindex();
   renderDaysStrip();
   updateMobileView();
 }
 
+// Cała siatka to jeden przystanek klawisza Tab — dalej poruszamy się strzałkami.
+function applyRovingTabindex(preferred) {
+  if (!studioGrid) return;
+
+  const slots = Array.from(studioGrid.querySelectorAll('.s-slot-btn:not(:disabled)'));
+  if (slots.length === 0) return;
+
+  const target = (preferred && slots.includes(preferred))
+    ? preferred
+    : (slots.find(s => s.classList.contains('is-selected')) || slots[0]);
+
+  slots.forEach(s => { s.tabIndex = (s === target) ? 0 : -1; });
+}
+
+function findSlotInDirection(row, col, hour, dRow, dCol) {
+  if (!studioGrid) return null;
+
+  const slots = Array.from(studioGrid.querySelectorAll('.s-slot-btn:not(:disabled)'))
+    .map(el => ({
+      el,
+      row: parseInt(el.dataset.row, 10),
+      col: parseInt(el.dataset.col, 10),
+      min: timeToMinutes(el.dataset.hour)
+    }));
+
+  // Pion: zostajemy w tej samej kolumnie (kolumny są zbite, więc kolejny
+  // wiersz to po prostu późniejsza godzina tego samego dnia).
+  if (dRow) {
+    const inColumn = slots.filter(s => s.col === col && Math.sign(s.row - row) === Math.sign(dRow));
+    const hit = inColumn
+      .slice()
+      .sort((a, b) => Math.abs(a.row - row) - Math.abs(b.row - row))[0];
+    return hit ? hit.el : null;
+  }
+
+  // Poziom: najbliższa kolumna w danym kierunku. Dni mogą mieć różne
+  // godziny, więc szukamy na tej samej godzinie, a gdy jej nie ma —
+  // najbliższej godzinowo.
+  const columns = slots
+    .filter(s => Math.sign(s.col - col) === Math.sign(dCol))
+    .sort((a, b) => Math.abs(a.col - col) - Math.abs(b.col - col));
+  if (columns.length === 0) return null;
+
+  const targetCol = columns[0].col;
+  const inTarget = slots.filter(s => s.col === targetCol);
+
+  const sameHour = inTarget.find(s => s.el.dataset.hour === hour);
+  if (sameHour) return sameHour.el;
+
+  const current = timeToMinutes(hour);
+  const hit = inTarget
+    .slice()
+    .sort((a, b) => Math.abs(a.min - current) - Math.abs(b.min - current))[0];
+  return hit ? hit.el : null;
+}
+
+if (studioGrid) {
+  studioGrid.addEventListener('keydown', (e) => {
+    const step = {
+      ArrowLeft:  [0, -1],
+      ArrowRight: [0, 1],
+      ArrowUp:    [-1, 0],
+      ArrowDown:  [1, 0]
+    }[e.key];
+    if (!step) return;
+
+    const current = e.target.closest('.s-slot-btn');
+    if (!current || current.disabled) return;
+
+    e.preventDefault();
+
+    const next = findSlotInDirection(
+      parseInt(current.dataset.row, 10),
+      parseInt(current.dataset.col, 10),
+      current.dataset.hour,
+      step[0],
+      step[1]
+    );
+
+    if (next) {
+      applyRovingTabindex(next);
+      next.focus();
+    }
+  });
+}
+
+// ── Najbliższy wolny termin ─────────────────────────────────
+
+function findNextAvailable(daysAhead = 60) {
+  const activeServiceObj = getServiceByName(selectedService);
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+
+  for (let offset = 0; offset < daysAhead; offset++) {
+    const dayDate = new Date(start);
+    dayDate.setDate(dayDate.getDate() + offset);
+
+    const dayIndex = dayDate.getDay() === 0 ? 6 : dayDate.getDay() - 1;
+    const dateStr  = formatDateISO(dayDate);
+    const hours    = getHoursForDay(dayDate, dayIndex).slice().sort(compareHours);
+
+    for (const hour of hours) {
+      const info = getSlotState(dayDate, dateStr, hour, activeServiceObj);
+      if (info.state === 'free') return { dayDate, dayIndex, dateStr, hour, info };
+    }
+  }
+
+  return null;
+}
+
+if (nextFreeBtn) {
+  nextFreeBtn.addEventListener('click', () => {
+    const found = findNextAvailable();
+
+    if (!found) {
+      alert('Nie znalazłem wolnego terminu w najbliższych tygodniach. Napisz do mnie na kontakt@psiapsi.pl.');
+      return;
+    }
+
+    currentMonday          = getMonday(found.dayDate);
+    selectedMobileDayIndex = found.dayIndex;
+
+    track('najblizszy_wolny', `${found.dateStr} ${found.hour} · ${selectedService}`);
+
+    selectSlot(found.dayDate, found.dayIndex, found.hour, found.info);
+  });
+}
+
 // ── Wybór slotu ─────────────────────────────────────────────
 
-function selectSlot(dateStr, hour, dayDate, dayIndex, groupCount, fixedLocation = null, bookedServiceName = '') {
+function selectSlot(dayDate, dayIndex, hour, info) {
+  const dateStr = formatDateISO(dayDate);
+
   selectedDateStr        = dateStr;
   selectedHour           = hour;
   selectedDayDate        = dayDate;
   selectedMobileDayIndex = dayIndex;
 
-  if (bookingDateInput)  bookingDateInput.value  = dateStr;
-  if (timeSlotHidden)    timeSlotHidden.value    = hour;
+  track('termin_wybrany', `${dateStr} ${hour} · ${selectedService}`);
 
-  // Jeśli ktoś klika w slot, w którym trwają już konkretne zajęcia grupowe
-  if (groupCount > 0 && bookedServiceName) {
-    const matchedService = availableServices.find(s => s.name.toLowerCase() === bookedServiceName.toLowerCase());
+  if (bookingDateInput) bookingDateInput.value = dateStr;
+  if (timeSlotHidden)   timeSlotHidden.value   = hour;
+
+  // Slot, w którym trwają już konkretne zajęcia grupowe: przełączamy
+  // zaznaczoną usługę i blokujemy lokalizację na tej wybranej przez pierwszą osobę.
+  if (info && info.groupCount > 0 && info.service) {
+    const matchedService = getServiceByName(info.service);
+
     if (matchedService) {
       selectedService = matchedService.name;
       if (serviceTypeHidden) serviceTypeHidden.value = matchedService.name;
+
       document.querySelectorAll('.s-service-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.service === matchedService.name);
+        const isActive = btn.dataset.service === matchedService.name;
+        btn.classList.toggle('active', isActive);
+        btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
       });
     }
-    updateLocationOptions(fixedLocation);
+
+    updateLocationOptions(info.location || null);
   } else {
     if (serviceTypeHidden) serviceTypeHidden.value = selectedService;
     updateLocationOptions(null);
   }
 
   if (selectedSummaryText) {
-    const dayLabel = dayNames[dayDate.getDay() === 0 ? 6 : dayDate.getDay() - 1];
-    selectedSummaryText.textContent = `${dayLabel}, ${formatDatePL(dayDate)} · godz. ${hour} · ${selectedService}`;
+    const endLabel = (info && info.endTime) ? `–${info.endTime}` : '';
+    selectedSummaryText.textContent =
+      `${getPolishDayName(dayDate)}, ${formatDatePL(dayDate)} · godz. ${hour}${endLabel} · ${selectedService}`;
   }
 
   showStep3();
@@ -502,10 +930,10 @@ function selectSlot(dateStr, hour, dayDate, dayIndex, groupCount, fixedLocation 
 }
 
 function showStep3() {
-  if (step3Section) {
-    step3Section.classList.remove('s-step--hidden');
-    step3Section.removeAttribute('aria-hidden');
-  }
+  if (!step3Section) return;
+  step3Section.classList.remove('s-step--hidden');
+  step3Section.removeAttribute('aria-hidden');
+  step3Section.focus({ preventScroll: true });
 }
 
 function hideStep3() {
@@ -515,14 +943,33 @@ function hideStep3() {
   }
 }
 
-// ── Pasek dni (mobile & strip) ──────────────────────────────
+// Czyści wybór terminu — także ukryte pola formularza i stan płci psa,
+// żeby po „Zarezerwuj kolejny termin” nic nie zostało z poprzedniego zapisu.
+function clearSelection() {
+  selectedDateStr = '';
+  selectedHour    = '';
+  selectedDayDate = null;
+
+  if (bookingDateInput) bookingDateInput.value = '';
+  if (timeSlotHidden)   timeSlotHidden.value   = '';
+
+  selectedGender = 'pies';
+  document.querySelectorAll('.s-gender-btn').forEach(b => {
+    const isActive = b.dataset.gender === 'pies';
+    b.classList.toggle('active', isActive);
+    b.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+  });
+
+  hideStep3();
+}
+
+// ── Pasek dni (mobile) ──────────────────────────────────────
 
 function renderDaysStrip() {
   if (!mobileDaysStrip) return;
   mobileDaysStrip.innerHTML = '';
 
-  const groupServiceObj = availableServices.find(s => !s.is1on1) || { maxDogs: 3 };
-  const maxGroupDogs = groupServiceObj.maxDogs || 3;
+  const activeServiceObj = getServiceByName(selectedService);
 
   for (let i = 0; i < 7; i++) {
     const dayDate   = new Date(currentMonday);
@@ -530,27 +977,19 @@ function renderDaysStrip() {
     const dateStr   = formatDateISO(dayDate);
     const todayFlag = isToday(dayDate);
 
-    const dayHours = getHoursForDay(dayDate, i);
-    let hasAvailable = false, hasPartial = false;
+    // Ten sam stan slotu, co w siatce — kropka nie może mówić czegoś innego.
+    let hasFree = false;
+    let hasPartial = false;
 
-    dayHours.forEach(hour => {
-      const inPast  = isSlotInPast(dayDate, hour);
-      const matches = bookedData.filter(b => b.date === dateStr && b.timeSlot === hour);
-      const has1on1 = matches.some(m => {
-        const s = (m.serviceType || '').toLowerCase();
-        const sObj = availableServices.find(x => x.name.toLowerCase() === s);
-        return sObj ? sObj.is1on1 : (s.includes('1-1') || s.includes('indywidualny') || s.includes('konsultacja'));
-      });
-      const groupCount = matches.length;
-      if (!inPast && !has1on1 && groupCount < maxGroupDogs) {
-        if (groupCount > 0) hasPartial = true;
-        else hasAvailable = true;
-      }
+    getHoursForDay(dayDate, i).forEach(hour => {
+      const state = getSlotState(dayDate, dateStr, hour, activeServiceObj).state;
+      if (state === 'free') hasFree = true;
+      else if (state === 'partial') hasPartial = true;
     });
 
-    let dotColor = '#D1D5DB';
-    if (hasAvailable) dotColor = '#1B6B50';
-    else if (hasPartial) dotColor = '#D97706';
+    const dotClass = hasFree ? 'is-free' : (hasPartial ? 'is-partial' : 'is-busy');
+    const summary  = hasFree ? 'są wolne terminy'
+      : (hasPartial ? 'można jeszcze dołączyć' : 'brak wolnych terminów');
 
     const pill = document.createElement('button');
     pill.type = 'button';
@@ -560,8 +999,10 @@ function renderDaysStrip() {
     pill.innerHTML = `
       <span class="s-day-name">${shortDayNames[i]}</span>
       <span class="s-day-num">${dayDate.getDate()}</span>
-      <span class="s-day-dot" style="background:${dotColor}"></span>
+      <span class="s-day-dot ${dotClass}"></span>
     `;
+    pill.setAttribute('aria-pressed', i === selectedMobileDayIndex ? 'true' : 'false');
+    pill.setAttribute('aria-label', `${dayNames[i]}, ${formatDatePL(dayDate)}${todayFlag ? ' (dzisiaj)' : ''} — ${summary}`);
     pill.addEventListener('click', () => {
       selectedMobileDayIndex = i;
       updateMobileView();
@@ -573,14 +1014,18 @@ function renderDaysStrip() {
 function updateMobileView() {
   if (mobileDaysStrip) {
     mobileDaysStrip.querySelectorAll('.s-day-pill').forEach((p, idx) => {
-      p.classList.toggle('active', idx === selectedMobileDayIndex);
+      const isActive = idx === selectedMobileDayIndex;
+      p.classList.toggle('active', isActive);
+      p.setAttribute('aria-pressed', isActive ? 'true' : 'false');
     });
   }
+
   if (studioGrid) {
     studioGrid.querySelectorAll('.s-day-col').forEach((col, idx) => {
       col.classList.toggle('is-mobile-active', idx === selectedMobileDayIndex);
     });
   }
+
   if (mobileDayBannerTitle) {
     const d = new Date(currentMonday);
     d.setDate(d.getDate() + selectedMobileDayIndex);
@@ -592,8 +1037,11 @@ function updateMobileView() {
 
 document.querySelectorAll('.s-gender-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.s-gender-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
+    document.querySelectorAll('.s-gender-btn').forEach(b => {
+      const isActive = b === btn;
+      b.classList.toggle('active', isActive);
+      b.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
     selectedGender = btn.dataset.gender;
   });
 });
@@ -602,11 +1050,9 @@ document.querySelectorAll('.s-gender-btn').forEach(btn => {
 
 if (changeSelectionBtn) {
   changeSelectionBtn.addEventListener('click', () => {
-    selectedDateStr = '';
-    selectedHour    = '';
-    hideStep3();
-    document.getElementById('step2')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    clearSelection();
     renderCalendar();
+    document.getElementById('step2')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 }
 
@@ -629,6 +1075,7 @@ if (spotkaniaForm) {
     const firstName   = fd.get('firstName');
     const lastName    = fd.get('lastName');
     const clientEmail = fd.get('clientEmail');
+    const clientPhone = fd.get('clientPhone');
     const dogName     = fd.get('dogName');
     const dogAge      = fd.get('dogAge');
     // Pobieramy bezpośrednio z locationSelect.value, bo pola disabled nie trafiają do FormData
@@ -649,10 +1096,17 @@ if (spotkaniaForm) {
       firstName,
       lastName,
       clientEmail,
+      clientPhone,
       dogName,
       dogAge,
-      dogGender:   selectedGender
+      dogGender:   selectedGender,
+      dogSociability: dogSociabilityInput ? dogSociabilityInput.value : '',
+      dogNotes:       dogNotesInput ? dogNotesInput.value.trim() : '',
+      healthConfirm:  healthConfirmInput ? healthConfirmInput.checked : false,
+      rodoConsent:    rodoConsentInput ? rodoConsentInput.checked : false
     };
+
+    track('formularz_wyslany', `${selectedService} · ${selectedDateStr} ${selectedHour}`);
 
     try {
       const res  = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) });
@@ -666,19 +1120,30 @@ if (spotkaniaForm) {
           location:    locValue
         });
 
+        lastBooking = {
+          date:        selectedDateStr,
+          hour:        selectedHour,
+          service:     selectedService,
+          location:    locValue,
+          description: `Zajęcia: ${selectedService}\nOpiekun: ${firstName} ${lastName}\nPies: ${dogName}\nKontakt: ${clientPhone || clientEmail}`
+        };
+
         if (modalSummaryDetails) {
           modalSummaryDetails.innerHTML = `
-            <div><strong>Termin:</strong> ${dateDisplay}, godz. ${selectedHour}</div>
-            <div><strong>Usługa:</strong> ${selectedService}</div>
-            <div><strong>Opiekun:</strong> ${firstName} ${lastName} (${clientEmail})</div>
-            <div><strong>Pies:</strong> ${dogName} (${dogAge} lat, ${selectedGender})</div>
-            <div><strong>Lokalizacja:</strong> ${locValue}</div>
+            <div><strong>Termin:</strong> ${escapeHtml(dateDisplay)}, godz. ${escapeHtml(selectedHour)}</div>
+            <div><strong>Zajęcia:</strong> ${escapeHtml(selectedService)}</div>
+            <div><strong>Opiekun:</strong> ${escapeHtml(firstName)} ${escapeHtml(lastName)} (${escapeHtml(clientEmail)})</div>
+            <div><strong>Pies:</strong> ${escapeHtml(dogName)} (${escapeHtml(dogAge)} lat, ${escapeHtml(selectedGender)})</div>
+            <div><strong>Miejsce:</strong> ${escapeHtml(locValue)}</div>
           `;
         }
+
+        track('rezerwacja_przyjeta', `${selectedService} · ${selectedDateStr} ${selectedHour}`);
 
         hideStep3();
         if (successSection) {
           successSection.classList.remove('s-step--hidden');
+          successSection.focus({ preventScroll: true });
           successSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
@@ -688,13 +1153,16 @@ if (spotkaniaForm) {
         renderCalendar();
 
       } else if (data.status === 'conflict') {
+        track('rezerwacja_konflikt', data.message || '');
         alert('⚠️ ' + (data.message || 'Ten termin właśnie zajął ktoś inny. Wybierz inny slot.'));
         fetchBookings();
       } else {
+        track('rezerwacja_blad', data.message || '');
         alert('Błąd: ' + (data.message || 'Wystąpił problem. Spróbuj ponownie.'));
       }
     } catch (err) {
       console.error(err);
+      track('rezerwacja_blad', 'brak połączenia');
       alert('Wystąpił problem z połączeniem. Spróbuj ponownie za chwilę.');
     } finally {
       submitBtn.disabled = false;
@@ -709,6 +1177,47 @@ if (closeModalBtn) {
   closeModalBtn.addEventListener('click', () => {
     if (successSection) successSection.classList.add('s-step--hidden');
     document.getElementById('step1')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+}
+
+// ── Ekran sukcesu: dodanie do kalendarza i kolejna rezerwacja ─────────
+
+if (addToCalendarBtn) {
+  addToCalendarBtn.addEventListener('click', () => {
+    track('dodaj_do_kalendarza', lastBooking ? lastBooking.service : '');
+    downloadIcs();
+  });
+}
+
+if (anotherBookingBtn) {
+  anotherBookingBtn.addEventListener('click', () => {
+    if (successSection) successSection.classList.add('s-step--hidden');
+    clearSelection();
+    renderCalendar();
+    document.getElementById('step1')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+}
+
+// ── Menu w nagłówku (mobile) ───────────────────────────────────────
+
+if (menuToggle && siteHeader) {
+  const setMenu = (open) => {
+    siteHeader.classList.toggle('is-menu-open', open);
+    menuToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    menuToggle.setAttribute('aria-label', open ? 'Zamknij menu' : 'Otwórz menu');
+  };
+
+  menuToggle.addEventListener('click', () => {
+    setMenu(!siteHeader.classList.contains('is-menu-open'));
+  });
+
+  // Zamknij po kliknięciu odnośnika wewnątrz menu
+  siteHeader.querySelector('.s-nav-links')?.addEventListener('click', (e) => {
+    if (e.target.closest('a')) setMenu(false);
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') setMenu(false);
   });
 }
 
@@ -778,4 +1287,10 @@ if (mobileNextDayBtn) {
 }
 
 // ── Inicjalizacja ───────────────────────────────────────────
+// Renderujemy natychmiast z pamięci podręcznej (brak migotania),
+// a następnie w tle odświeżamy dane z Arkusza Google.
+renderServices();
+renderPricing();
+renderCalendar();
+updateLocationOptions();
 fetchBookings();

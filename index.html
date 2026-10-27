@@ -4,14 +4,64 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Psiapsi — Spacery, konsultacje behawioralne i treningi dla psów w Warszawie (Wawer). Zarezerwuj termin online w mniej niż minutę.">
+  <meta name="robots" content="index, follow">
+  <meta name="theme-color" content="#1B6B50">
+  <link rel="canonical" href="https://psiapsi.pl/">
   <title>Psiapsi — Spacery, Konsultacje i Treningi Psów | Warszawa Wawer</title>
-  
+
+  <!-- Favicon (inline SVG — bez dodatkowych zapytań) -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%90%BE%3C/text%3E%3C/svg%3E">
+
+  <!-- Open Graph / Social -->
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="pl_PL">
+  <meta property="og:site_name" content="Psiapsi">
+  <meta property="og:title" content="Psiapsi — Spacery, Konsultacje i Treningi Psów | Warszawa Wawer">
+  <meta property="og:description" content="Spacery w otulinie Mazowieckiego Parku Krajobrazowego, małe grupy do 3 psów i konsultacje behawioralne. Zarezerwuj termin online w mniej niż minutę.">
+  <meta property="og:url" content="https://psiapsi.pl/">
+  <meta property="og:image" content="https://psiapsi.pl/images/Niko_Natka.jpg">
+  <meta property="og:image:alt" content="Niko i Natka — opiekunka i pies Psiapsi">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Psiapsi — Spacery, Konsultacje i Treningi Psów | Warszawa Wawer">
+  <meta name="twitter:description" content="Spacery w otulinie Mazowieckiego Parku Krajobrazowego, małe grupy do 3 psów i konsultacje behawioralne. Zarezerwuj termin online w mniej niż minutę.">
+  <meta name="twitter:image" content="https://psiapsi.pl/images/Niko_Natka.jpg">
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles/spotkania.css">
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "LocalBusiness",
+    "name": "Psiapsi",
+    "description": "Spacery, konsultacje behawioralne i treningi dla psów w Warszawie (Wawer).",
+    "url": "https://psiapsi.pl/",
+    "image": "https://psiapsi.pl/images/Niko_Natka.jpg",
+    "email": "kontakt@psiapsi.pl",
+    "areaServed": { "@type": "Place", "name": "Warszawa Wawer" },
+    "address": {
+      "@type": "PostalAddress",
+      "addressLocality": "Warszawa",
+      "addressRegion": "Mazowieckie",
+      "addressCountry": "PL"
+    },
+    "sameAs": ["https://instagram.com/niko.w.podrozy"],
+    "makesOffer": [
+      { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Spacer socjalizacyjny" } },
+      { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Grupowe zajęcia posłuszeństwa" } },
+      { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Socjalizacja szczeniąt" } },
+      { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Trening indywidualny 1-1" } },
+      { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Zajęcia dla psów lękliwych i reaktywnych" } },
+      { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Konsultacja behawioralna" } }
+    ]
+  }
+  </script>
 </head>
 <body>
+
+  <a href="#main-content" class="s-skip-link">Przejdź do treści głównej</a>
 
   <!-- Nagłówek serwisu -->
   <header class="s-header">
@@ -24,32 +74,40 @@
         </div>
       </a>
 
-      <nav class="s-nav-links">
-        <a href="#rezerwacja" class="s-nav-link">Grafik & Rezerwacja</a>
-        <a href="#o-nas" class="s-nav-link">O mnie</a>
-        <a href="#dlaczego-my" class="s-nav-link">Dlaczego my</a>
+      <button type="button" class="s-menu-toggle" id="menuToggle"
+              aria-expanded="false" aria-controls="mainNav" aria-label="Otwórz menu">
+        <span aria-hidden="true">☰</span>
+      </button>
+
+      <nav class="s-nav-links" id="mainNav" aria-label="Nawigacja główna">
+        <a href="#step1" class="s-nav-link">Rezerwacja</a>
+        <a href="#jak-to-dziala" class="s-nav-link">Jak to działa</a>
+        <a href="#cennik" class="s-nav-link">Cennik</a>
+        <a href="#opinie" class="s-nav-link">Opinie</a>
         <a href="#faq" class="s-nav-link">Pytania</a>
+        <!-- UWAGA: podmień numer na prawdziwy -->
         <a href="tel:+48500000000" class="s-header-cta">📞 Zadzwoń</a>
       </nav>
     </div>
   </header>
 
   <!-- Główna zawartość -->
-  <main class="s-main">
+  <main class="s-main" id="main-content">
     <div class="s-page">
 
       <!-- Hero Banner z Kalendarzem w centrum -->
-      <div class="s-page-title" id="rezerwacja">
-        <h1>Bezpieczne spacery i przemyślany trening Twojego psa</h1>
+      <div class="s-page-title" id="start">
+        <h1>Psia szkoła, w której trenujesz razem ze swoim psem</h1>
         <p>
-          Wybierz dogodny termin i zarezerwuj spotkanie online. Indywidualne podejście, zrozumienie emocji psa i leśne trasy w otulinie Mazowieckiego Parku Krajobrazowego (Wawer).
+          Spacery socjalizacyjne na leśnych trasach Wawra i zajęcia w salce treningowej. Ty prowadzisz psa, ja tłumaczę, co widzę i co zmienić — w małych grupach, bez metod awersyjnych i bez oceniania.
         </p>
 
         <div class="s-hero-badges">
-          <span class="s-badge s-badge--highlight">🌲 Leśne tereny Wawra</span>
-          <span class="s-badge">🐕 Małe grupy do 3 psów lub 1-1</span>
-          <span class="s-badge">📅 Natychmiastowy wpis do Google Calendar</span>
+          <span class="s-badge s-badge--highlight">🌲 Trasy leśne Wawra</span>
+          <span class="s-badge">🏠 Salka treningowa (Wawer)</span>
+          <span class="s-badge">👥 Małe grupy — opiekun z psem</span>
           <span class="s-badge">❤️ 100% pozytywnych metod</span>
+          <span class="s-badge">📅 Potwierdzenie w Kalendarzu Google</span>
         </div>
       </div>
 
@@ -59,7 +117,7 @@
           <span class="s-step-num">1</span>
           <span>Wybierz rodzaj zajęć</span>
         </div>
-        <div class="s-service-row" id="serviceRowContainer">
+        <div class="s-service-row" id="serviceRowContainer" role="group" aria-label="Rodzaj zajęć">
           <div class="s-service-loading">
             <span class="s-service-loading-dot">🐾</span> Ładowanie dostępnych zajęć...
           </div>
@@ -79,10 +137,11 @@
           <span class="s-week-label" id="weekRangeLabel">Tydzień</span>
           <button type="button" class="s-week-arrow" id="nextWeekBtn" aria-label="Następny tydzień">›</button>
           <button type="button" class="s-today-btn" id="todayJumpBtn">Dzisiaj</button>
+          <button type="button" class="s-today-btn s-today-btn--accent" id="nextFreeBtn">⚡ Najbliższy wolny</button>
         </div>
 
         <!-- Pasek dni (desktop i mobile) -->
-        <div class="s-days-strip" id="mobileDaysStrip"></div>
+        <div class="s-days-strip" id="mobileDaysStrip" role="group" aria-label="Wybór dnia tygodnia"></div>
 
         <!-- Baner aktywnego dnia (mobile) -->
         <div class="s-mobile-banner" id="mobileActiveDayBanner">
@@ -92,18 +151,18 @@
         </div>
 
         <!-- Siatka slotów -->
-        <div class="s-slots-grid" id="studioGrid"></div>
+        <div class="s-slots-grid" id="studioGrid" role="group" aria-label="Dostępne terminy"></div>
 
         <!-- Legenda -->
         <div class="s-legend">
           <span class="s-legend-item"><span class="s-dot free"></span>Wolny termin</span>
-          <span class="s-legend-item"><span class="s-dot partial"></span>Spacer grupowy (dołącz)</span>
+          <span class="s-legend-item"><span class="s-dot partial"></span>Grupa — są wolne miejsca</span>
           <span class="s-legend-item"><span class="s-dot busy"></span>Zajęty</span>
         </div>
       </section>
 
       <!-- KROK 3: Dane (pojawia się automatycznie po kliknięciu godziny) -->
-      <section class="s-step s-step--form s-step--hidden" id="step3" aria-hidden="true">
+      <section class="s-step s-step--form s-step--hidden" id="step3" aria-hidden="true" tabindex="-1" aria-label="Twoje dane i potwierdzenie">
         <div class="s-step-label">
           <span class="s-step-num">3</span>
           <span>Twoje dane i potwierdzenie</span>
@@ -130,10 +189,16 @@
               <label for="lastName">Twoje nazwisko</label>
               <input type="text" id="lastName" name="lastName" placeholder="np. Kowalska" required autocomplete="family-name">
             </div>
-            <div class="s-field s-field--full">
-              <label for="clientEmail">Adres e-mail (do zaproszenia w Kalendarzu Google)</label>
+            <div class="s-field">
+              <label for="clientEmail">Adres e-mail</label>
               <input type="email" id="clientEmail" name="clientEmail" placeholder="twoj.adres@gmail.com" required autocomplete="email">
-              <span class="s-field-hint">Na ten adres wyślemy oficjalne zaproszenie i potwierdzenie spotkania.</span>
+            </div>
+            <div class="s-field">
+              <label for="clientPhone">Telefon kontaktowy</label>
+              <input type="tel" id="clientPhone" name="clientPhone" placeholder="np. 600 100 200" required autocomplete="tel" inputmode="tel">
+            </div>
+            <div class="s-field s-field--full">
+              <span class="s-field-hint">Na e-mail wyślemy zaproszenie w Kalendarzu Google i potwierdzenie. Numer telefonu przydaje się, gdyby coś wydarzyło się na trasie.</span>
             </div>
             <div class="s-field">
               <label for="dogName">Imię psa</label>
@@ -144,11 +209,26 @@
               <input type="number" id="dogAge" name="dogAge" placeholder="np. 3" min="0" max="20" required>
             </div>
             <div class="s-field s-field--full">
-              <label>Płeć psa</label>
-              <div class="s-gender-row">
-                <button type="button" class="s-gender-btn active" data-gender="pies">🐕 Pies (samiec)</button>
-                <button type="button" class="s-gender-btn" data-gender="suka">🐩 Suka</button>
+              <label id="dogGenderLabel">Płeć psa</label>
+              <div class="s-gender-row" role="group" aria-labelledby="dogGenderLabel">
+                <button type="button" class="s-gender-btn active" data-gender="pies" aria-pressed="true">🐕 Pies (samiec)</button>
+                <button type="button" class="s-gender-btn" data-gender="suka" aria-pressed="false">🐩 Suka</button>
               </div>
+            </div>
+            <div class="s-field s-field--full">
+              <label for="dogSociability">Jak Twój pies reaguje na inne psy?</label>
+              <select id="dogSociability" name="dogSociability" required>
+                <option value="Spokojnie – wita się lub ignoruje">Spokojnie – wita się lub ignoruje</option>
+                <option value="Neutralnie – potrzebuje chwili dystansu">Neutralnie – potrzebuje chwili dystansu</option>
+                <option value="Pobudliwie – mocno ciągnie do psów">Pobudliwie – mocno ciągnie do psów</option>
+                <option value="Lękliwie – boi się innych psów">Lękliwie – boi się innych psów</option>
+                <option value="Pierwszy kontakt – nie wiem">Pierwszy kontakt – nie wiem</option>
+              </select>
+              <span class="s-field-hint">Dzięki temu dobierzemy odpowiednich kompanów do spaceru grupowego.</span>
+            </div>
+            <div class="s-field s-field--full">
+              <label for="dogNotes">Ważne informacje o psie <span class="s-optional">(opcjonalnie)</span></label>
+              <textarea id="dogNotes" name="dogNotes" rows="3" placeholder="Zdrowie, alergie, przyjmowane leki, lęk przed hałasem, ulubione smakołyki…"></textarea>
             </div>
             <div class="s-field s-field--full">
               <label for="locationSelect">Miejsce spotkania</label>
@@ -156,6 +236,17 @@
                 <option value="Warszawa Wawer (trasy leśne MPK)" selected>Warszawa Wawer (trasy leśne MPK)</option>
               </select>
             </div>
+          </div>
+
+          <div class="s-consents">
+            <label class="s-checkbox">
+              <input type="checkbox" id="healthConfirm" name="healthConfirm" required>
+              <span>Potwierdzam, że pies jest zdrowy, ma aktualne szczepienia i nie jest w trakcie leczenia.</span>
+            </label>
+            <label class="s-checkbox">
+              <input type="checkbox" id="rodoConsent" name="rodoConsent" required>
+              <span>Wyrażam zgodę na przetwarzanie moich danych osobowych w celu obsługi tej rezerwacji. <a href="#rodo">Informacja RODO</a>.</span>
+            </label>
           </div>
 
           <button type="submit" class="s-submit-btn" id="submitBtn">
@@ -167,39 +258,113 @@
       </section>
 
       <!-- Stan sukcesu -->
-      <section class="s-success s-step--hidden" id="successSection" aria-live="polite">
+      <section class="s-success s-step--hidden" id="successSection" role="status" aria-live="polite" tabindex="-1">
         <div class="s-success-inner">
           <div class="s-success-icon">🎉</div>
           <h2>Rezerwacja przyjęta!</h2>
           <p>Wydarzenie zostało utworzone w systemie, a oficjalne zaproszenie wysłane do Twojego Kalendarza Google.</p>
           <div class="s-success-details" id="modalSummaryDetails"></div>
-          <button type="button" class="s-success-btn" id="closeModalBtn">Wróć do grafiku</button>
+          <div class="s-success-actions">
+            <button type="button" class="s-success-btn" id="closeModalBtn">Wróć do grafiku</button>
+            <button type="button" class="s-success-btn s-success-btn--ghost" id="addToCalendarBtn">📅 Dodaj do kalendarza</button>
+            <button type="button" class="s-success-btn s-success-btn--ghost" id="anotherBookingBtn">Zarezerwuj kolejny termin</button>
+            <a class="s-success-btn s-success-btn--ghost" href="https://instagram.com/niko.w.podrozy" target="_blank" rel="noopener">📸 Obserwuj na Instagramie</a>
+          </div>
         </div>
+      </section>
+
+      <!-- ── SEKCJA: JAK TO DZIAŁA ────────────────────────────────────── -->
+      <section class="s-section" id="jak-to-dziala">
+        <div class="s-section-header">
+          <span class="s-section-tag">Przebieg</span>
+          <h2 class="s-section-title">Jak wygląda jedno spotkanie?</h2>
+          <p class="s-section-desc">Od zapisu do zadania, z którym wychodzisz do domu.</p>
+        </div>
+
+        <ol class="s-flow">
+          <li class="s-flow-step">
+            <span class="s-flow-num">1</span>
+            <div class="s-flow-body">
+              <h3 class="s-flow-title">Wybierasz zajęcia i termin online</h3>
+              <p class="s-flow-text">Spacer socjalizacyjny, zajęcia w salce albo trening jeden na jeden — plus krótka informacja o psie. Zajmuje to mniej niż minutę.</p>
+            </div>
+          </li>
+          <li class="s-flow-step">
+            <span class="s-flow-num">2</span>
+            <div class="s-flow-body">
+              <h3 class="s-flow-title">Dostajesz potwierdzenie i zaproszenie</h3>
+              <p class="s-flow-text">E-mail z podsumowaniem oraz zaproszenie w Kalendarzu Google. Z ekranu potwierdzenia możesz też dodać termin do własnego kalendarza jednym kliknięciem.</p>
+            </div>
+          </li>
+          <li class="s-flow-step">
+            <span class="s-flow-num">3</span>
+            <div class="s-flow-body">
+              <h3 class="s-flow-title">Spotykamy się — na trasie albo w salce</h3>
+              <p class="s-flow-text">Jesteś cały czas ze swoim psem i to Ty go prowadzisz. Ja pokazuję, jak czytać jego sygnały, dobieram dystans i tempo do grupy.</p>
+            </div>
+          </li>
+          <li class="s-flow-step">
+            <span class="s-flow-num">4</span>
+            <div class="s-flow-body">
+              <h3 class="s-flow-title">Wychodzisz z zadaniem do pracy</h3>
+              <p class="s-flow-text">Po spotkaniu dostajesz krótką notatkę: nad czym pracujemy i co ćwiczyć do następnego razu, żeby efekt nie zniknął po tygodniu.</p>
+            </div>
+          </li>
+        </ol>
+      </section>
+
+      <!-- ── SEKCJA: CENNIK (renderowany z zakładki „Uslugi”) ─────────── -->
+      <section class="s-section" id="cennik">
+        <div class="s-section-header">
+          <span class="s-section-tag">Cennik</span>
+          <h2 class="s-section-title">Przejrzyste stawki, płatność na miejscu</h2>
+          <p class="s-section-desc">Płacisz po spotkaniu — gotówką lub BLIK-iem. Bez pakietów, bez zobowiązań na przyszłość.</p>
+        </div>
+
+        <div class="s-price-grid" id="priceGrid">
+          <div class="s-price-card s-price-card--loading">Ładowanie cennika…</div>
+        </div>
+
+        <p class="s-price-note">🔒 Bezpłatna zmiana terminu do 24 godzin przed spotkaniem. Trening indywidualny i konsultacje prowadzone są jeden na jeden, konsultacja obejmuje dojazd do Ciebie.</p>
+      </section>
+
+      <!-- ── SEKCJA: OPINIE (pokazywana tylko, gdy są dane w arkuszu) ─── -->
+      <section class="s-section s-section--hidden" id="opinie">
+        <div class="s-section-header">
+          <span class="s-section-tag">Opinie opiekunów</span>
+          <h2 class="s-section-title">Co mówią opiekunowie</h2>
+        </div>
+        <div class="s-testimonial-grid" id="testimonialGrid"></div>
       </section>
 
       <!-- ── SEKCJA 1: DLACZEGO MY ────────────────────────────────────── -->
       <section class="s-section" id="dlaczego-my">
         <div class="s-section-header">
           <span class="s-section-tag">Nasze podejście</span>
-          <h2 class="s-section-title">Dlaczego spacery z Psiapsi są wyjątkowe?</h2>
-          <p class="s-section-desc">Nie chodzi o zwykłe „wybieganie psa”. Dbamy o jego układ nerwowy, węszenie i zrównoważone relacje.</p>
+          <h2 class="s-section-title">Dlaczego to działa lepiej niż zwykły spacer?</h2>
+          <p class="s-section-desc">Nie chodzi o „wybieganie psa”. Uczysz się czytać swojego psa i pracować z nim w realnych warunkach — na trasie i w sali.</p>
         </div>
 
         <div class="s-features-grid">
           <div class="s-feature-card">
-            <span class="s-feature-icon">🌿</span>
-            <h3 class="s-feature-title">Leśne, bezpieczne trasy</h3>
-            <p class="s-feature-text">Spacery odbywają się w otulinie Mazowieckiego Parku Krajobrazowego. Brak miejskiego hałasu i bezpieczna przestrzeń do węszenia.</p>
+            <span class="s-feature-icon">🌲</span>
+            <h3 class="s-feature-title">Trening w realnych warunkach</h3>
+            <p class="s-feature-text">Spacer socjalizacyjny to praca w prawdziwym świecie: zapachy, rowerzyści, inne psy. Trasy w otulinie Mazowieckiego Parku Krajobrazowego dają bodźce, ale bez miejskiego hałasu.</p>
           </div>
           <div class="s-feature-card">
-            <span class="s-feature-icon">🐕‍🦺</span>
-            <h3 class="s-feature-title">Dobierane grupy (max 3 psy)</h3>
-            <p class="s-feature-text">Psy dobieramy pod kątem energii, gabarytów i temperamentu. Żaden pies nie czuje się przytłoczony ani zastraszony.</p>
+            <span class="s-feature-icon">🏠</span>
+            <h3 class="s-feature-title">Salka treningowa w Wawrze</h3>
+            <p class="s-feature-text">Kontrolowane warunki do pracy nad posłuszeństwem, koncentracją i lękami. Ćwiczenie można powtórzyć tyle razy, ile trzeba — bez samochodów i zaskoczeń za rogiem.</p>
           </div>
           <div class="s-feature-card">
-            <span class="s-feature-icon">📸</span>
-            <h3 class="s-feature-title">Relacje dla opiekuna</h3>
-            <p class="s-feature-text">Wiesz dokładnie, jak Twój pies spędza czas — po każdym spacerze otrzymujesz relację i zdjęcia ze wspólnej trasy.</p>
+            <span class="s-feature-icon">👥</span>
+            <h3 class="s-feature-title">Dobierane grupy</h3>
+            <p class="s-feature-text">Na trasie maksymalnie 3 psy, w salce do 4, a dla psów lękliwych — najwyżej 2. Łączymy psy pod kątem energii i temperamentu, żeby żaden nie czuł się przytłoczony.</p>
+          </div>
+          <div class="s-feature-card">
+            <span class="s-feature-icon">🧠</span>
+            <h3 class="s-feature-title">Ty też się uczysz</h3>
+            <p class="s-feature-text">Nie zostawiasz psa i nie wychodzisz — cały czas pracujesz ze swoim psem. Ja tłumaczę, co widzę, i podpowiadam, co zmienić, żeby pies rozumiał, czego od niego chcesz.</p>
           </div>
         </div>
       </section>
@@ -207,14 +372,17 @@
       <!-- ── SEKCJA 2: O MNIE ────────────────────────────────────────── -->
       <section class="s-section" id="o-nas">
         <div class="s-about-card">
-          <img src="images/Niko_Natka.jpg" alt="Niko i Natka — Psiapsi" class="s-about-avatar" loading="lazy">
+          <img src="images/Niko_Natka.jpg" alt="Niko i Natka — Psiapsi" class="s-about-avatar" width="96" height="96" loading="lazy" decoding="async">
           <div class="s-about-content">
             <span class="s-section-tag">Poznajmy się</span>
             <h2 class="s-about-name">Cześć, tu Niko! (@Niko.w.podrozy)</h2>
             <p class="s-about-bio">
-              Wierzę, że każdy pies zasługuje na cierpliwe prowadzenie, spokój i zrozumienie jego mowy ciała. Nie stosuję metod awersyjnych ani pośpiechu. Zamiast tego stawiam na budowanie zaufania, węszenie, eksplorację i zaspokajanie naturalnych psich potrzeb w bezpiecznym leśnym otoczeniu.
+              Prowadzę małą szkołę dla opiekunów i ich psów. Wierzę, że najwięcej zmienia nie praca „za opiekuna”, ale wspólne ćwiczenie — dlatego na moich zajęciach jesteś cały czas przy swoim psie i to Ty go prowadzisz.
             </p>
-            <span class="s-about-signature">Do zobaczenia na leśnym szlaku! 🐾</span>
+            <p class="s-about-bio">
+              Nie stosuję metod awersyjnych ani pośpiechu. Stawiam na zrozumienie psiej mowy ciała, węszenie i budowanie zaufania — na leśnych trasach Wawra i w salce treningowej.
+            </p>
+            <span class="s-about-signature">Do zobaczenia na trasie i w salce! 🐾</span>
           </div>
         </div>
       </section>
@@ -227,18 +395,54 @@
         </div>
 
         <div class="s-faq-list">
-          <div class="s-faq-item">
-            <h3 class="s-faq-question">Jak wygląda pierwszy spacer grupowy?</h3>
-            <p class="s-faq-answer">Zawsze dbamy o stopniowe zapoznanie równoległe (na odległość). Jeśli Twój pies potrzebuje więcej przestrzeni, zaczynamy od spaceru indywidualnego 1-1, aby dobrze poznać jego emocje.</p>
-          </div>
-          <div class="s-faq-item">
-            <h3 class="s-faq-question">Co w przypadku złej pogody?</h3>
-            <p class="s-faq-answer">Lekki deszcz nam niestraszny, ale w przypadku ulewy, burzy lub skrajnych upałów terminy przekładamy na dogodniejszą porę w porozumieniu z opiekunem.</p>
-          </div>
-          <div class="s-faq-item">
-            <h3 class="s-faq-question">Jak mogę odwołać lub zmienić termin?</h3>
-            <p class="s-faq-answer">Możesz bezpłatnie zmienić termin do 24 godzin przed planowanym spacerem — wystarczy odpowiedzieć na e-mail z rezerwacją lub wysłać wiadomość SMS.</p>
-          </div>
+          <details class="s-faq-item" open>
+            <summary class="s-faq-question">Jak wygląda pierwszy spacer socjalizacyjny?</summary>
+            <p class="s-faq-answer">Spotykamy się w ustalonym punkcie i idziemy całą grupą. Ty prowadzisz swojego psa, ja pokazuję, jak czytać jego sygnały i kiedy zwiększyć dystans. Zaczynamy od zapoznania na odległość — bez kontaktu na siłę i bez presji.</p>
+          </details>
+          <details class="s-faq-item">
+            <summary class="s-faq-question">Jak wygląda pierwsze zajęcie w salce?</summary>
+            <p class="s-faq-answer">Krótkie omówienie, rozgrzewka i konkretne zadania: posłuszeństwo, koncentracja na opiekunie, spokój w obecności innych psów. Pracujemy w tempie dopasowanym do grupy, a ćwiczenie powtarzamy tyle razy, ile trzeba.</p>
+          </details>
+          <details class="s-faq-item">
+            <summary class="s-faq-question">Gdzie dokładnie się spotykamy?</summary>
+            <p class="s-faq-answer">Spacery socjalizacyjne startują na terenie Wawra (Anin, Międzylesie), przy wejściu na trasy leśne. Zajęcia grupowe i trening indywidualny odbywają się w salce treningowej w Wawrze, a konsultacja — z moim dojazdem do Ciebie. Dokładny punkt spotkania potwierdzam razem z rezerwacją.</p>
+          </details>
+          <details class="s-faq-item">
+            <summary class="s-faq-question">Co zabrać na zajęcia?</summary>
+            <p class="s-faq-answer">Wygodną smycz (nie flexi), smakołyki pokrojone na drobne kawałki i ulubioną zabawkę. Jeśli pies pracuje w kagańcu albo nosi szele, zabierz je ze sobą. Na trasę warto wziąć wodę dla psa.</p>
+          </details>
+          <details class="s-faq-item">
+            <summary class="s-faq-question">Ile trwa spotkanie i od czego liczy się czas?</summary>
+            <p class="s-faq-answer">Czas trwania każdego rodzaju zajęć znajdziesz w cenniku. Podana godzina to moment startu w umówionym miejscu — liczymy od początku pracy z psem, a nie od wyjścia z domu.</p>
+          </details>
+          <details class="s-faq-item">
+            <summary class="s-faq-question">Czy mogę przyjść na zajęcia bez psa albo z drugą osobą?</summary>
+            <p class="s-faq-answer">Na pierwsze spotkanie możesz przyjść sam, żeby wszystko zobaczyć. Na zajęcia możecie przyjść we dwójkę — jedna osoba pracuje z psem, druga się przygląda i uczy się tego samego.</p>
+          </details>
+          <details class="s-faq-item">
+            <summary class="s-faq-question">Czy pies musi mieć aktualne szczepienia?</summary>
+            <p class="s-faq-answer">Tak. Prosimy o aktualne szczepienia oraz zabezpieczenie przed pasożytami zewnętrznymi. Jeśli pies jest w trakcie leczenia albo ma chorobę zakaźną, przesuniemy spotkanie na później — dla bezpieczeństwa jego i pozostałych psów.</p>
+          </details>
+          <details class="s-faq-item">
+            <summary class="s-faq-question">Czy pies musi być wykastrowany?</summary>
+            <p class="s-faq-answer">Nie stawiamy tego jako warunku. W grupie prosimy jednak o informację o cieczce — w takim terminie zamieniamy zajęcia grupowe na trening indywidualny.</p>
+          </details>
+          <details class="s-faq-item">
+            <summary class="s-faq-question">Czy przyjmujesz psy lękowe lub reaktywne?</summary>
+            <p class="s-faq-answer">Tak — prowadzę dla nich osobne zajęcia: w bardzo małej grupie (najwyżej 2 psy) albo indywidualnie w salce. Pracujemy w takim dystansie, w jakim pies jest jeszcze w stanie się uczyć. Napisz w uwagach, czego się spodziewać.</p>
+          </details>
+          <details class="s-faq-item">
+            <summary class="s-faq-question">Co w przypadku złej pogody?</summary>
+            <p class="s-faq-answer">Zajęcia w salce odbywają się niezależnie od pogody. Spacery socjalizacyjne przekładamy przy ulewie, burzy lub skrajnych upałach — odezwę się z propozycją nowego terminu.</p>
+          </details>
+          <details class="s-faq-item">
+            <summary class="s-faq-question">Jak mogę odwołać lub zmienić termin?</summary>
+            <p class="s-faq-answer">Możesz bezpłatnie zmienić termin do 24 godzin przed spotkaniem — wystarczy odpowiedzieć na e-mail z rezerwacją lub zadzwonić.</p>
+          </details>
+          <details class="s-faq-item">
+            <summary class="s-faq-question">Jak wygląda płatność i co z moimi danymi?</summary>
+            <p class="s-faq-answer">Płacisz po spotkaniu — gotówką lub BLIK-iem, bez zaliczek i pakietów. Dane z formularza wykorzystuję wyłącznie do obsługi rezerwacji i kontaktu; szczegóły znajdziesz w <a href="#rodo">informacji RODO</a> w stopce.</p>
+          </details>
         </div>
       </section>
 
@@ -258,10 +462,38 @@
         </div>
 
         <div class="s-footer-contact">
-          <span>📍 Warszawa Wawer (MPK / Anin / Międzylesie)</span>
+          <span>📍 Trasy leśne Wawra (Anin, Międzylesie) · 🏠 Salka treningowa w Wawrze · 🚗 Konsultacje z dojazdem</span>
           <span>📧 <a href="mailto:kontakt@psiapsi.pl">kontakt@psiapsi.pl</a></span>
-          <span>📸 Instagram: <a href="https://instagram.com" target="_blank" rel="noopener">@niko.w.podrozy</a></span>
+          <span>📞 <a href="tel:+48500000000">+48 500 000 000</a> <em>(podmień na prawdziwy numer)</em></span>
+          <span>📸 Instagram: <a href="https://instagram.com/niko.w.podrozy" target="_blank" rel="noopener">@niko.w.podrozy</a></span>
         </div>
+      </div>
+
+      <!-- Dokumenty: treści do uzupełnienia przez administratora danych -->
+      <div class="s-legal">
+        <details class="s-legal-item" id="rodo">
+          <summary class="s-legal-question">Informacja o przetwarzaniu danych osobowych (RODO)</summary>
+          <div class="s-legal-body">
+            <p><strong>Administrator danych:</strong> Psiapsi, kontakt@psiapsi.pl. <em>Uzupełnij pełną nazwę, adres i NIP.</em></p>
+            <p>Dane z formularza (imię, nazwisko, e-mail, telefon, informacje o psie) przetwarzamy wyłącznie w celu przyjęcia i obsługi rezerwacji, kontaktu w sprawie spotkania oraz utworzenia zaproszenia w kalendarzu — na podstawie art. 6 ust. 1 lit. b RODO (wykonanie umowy) oraz lit. f (prawnie uzasadniony interes: kontakt i obrona przed roszczeniami).</p>
+            <p>W obsłudze zapisów korzystamy z usług Google (Arkusz Google, Kalendarz Google, Gmail), w związku z czym dane są przetwarzane również poza terenem Polski, na warunkach opisanych w dokumentach Google. Nie przekazujemy danych w celach marketingowych i nie sprzedajemy ich osobom trzecim.</p>
+            <p>Dane przechowujemy przez czas niezbędny do obsługi rezerwacji i rozliczeń, a w zakresie wymaganym przepisami — do upływu okresu przedawnienia roszczeń.</p>
+            <p>Masz prawo dostępu do swoich danych, ich sprostowania, usunięcia, ograniczenia przetwarzania, przenoszenia oraz wniesienia sprzeciwu. Bez kontaktu z Tobą nie jesteśmy w stanie zrealizować usługi, więc wniesienie sprzeciwu wobec przetwarzania oznacza rezygnację z rezerwacji. Możesz również złożyć skargę do Prezesa Urzędu Ochrony Danych Osobowych.</p>
+            <p>Podanie danych jest dobrowolne, ale niezbędne do przyjęcia rezerwacji.</p>
+          </div>
+        </details>
+
+        <details class="s-legal-item" id="regulamin">
+          <summary class="s-legal-question">Regulamin usług</summary>
+          <div class="s-legal-body">
+            <p><strong>Zakres usług.</strong> Prowadzimy zajęcia dla opiekunów i ich psów: spacery socjalizacyjne na trasach leśnych Wawra (Anin, Międzylesie), zajęcia grupowe i trening indywidualny w salce treningowej w Wawrze oraz konsultacje behawioralne z dojazdem. Na zajęciach opiekun pracuje ze swoim psem; nie prowadzimy wyprowadzania psów bez opiekuna i nie świadczymy opieki weterynaryjnej ani nie podajemy leków, o ile nie zostało to ustalone osobno.</p>
+            <p><strong>Bezpieczeństwo.</strong> Pies musi być zdrowy, mieć aktualne szczepienia i być zabezpieczony przed pasożytami zewnętrznymi. Opiekun zobowiązuje się zgłosić przed zajęciami agresję, lęk, chorobę zakaźną oraz cieczkę.</p>
+            <p><strong>Terminy.</strong> Rezerwację możesz bezpłatnie zmienić lub odwołać do 24 godzin przed spotkaniem.</p>
+            <p><strong>Pogoda.</strong> Zajęcia w salce odbywają się niezależnie od pogody. W przypadku ulewy, burzy lub skrajnych upałów spacer socjalizacyjny przekładamy na inny, dogodny termin w porozumieniu z opiekunem.</p>
+            <p><strong>Płatność.</strong> Po spotkaniu — gotówką lub BLIK-iem. Nie pobieramy zaliczek.</p>
+            <p><strong>Zdarzenia losowe.</strong> W razie wypadku lub zdarzenia na trasie niezwłocznie kontaktujemy się z opiekunem i działamy zgodnie z jego wskazówkami.</p>
+          </div>
+        </details>
       </div>
 
       <div class="s-footer-bottom">

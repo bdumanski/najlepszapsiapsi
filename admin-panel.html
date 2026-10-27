@@ -1,0 +1,1306 @@
+<!DOCTYPE html>
+<!--
+  PsiApsi — panel administratora.
+
+  Ten plik to źródło strony, którą serwuje Apps Script pod adresem:
+      https://script.google.com/macros/s/…/exec?page=admin
+
+  Wdrożenie: w projekcie Apps Script dodaj plik HTML o nazwie „Admin”
+  i wklej do niego CAŁĄ zawartość tego pliku (bez żadnych zmian).
+  Panel rozmawia z serwerem przez google.script.run — funkcje adminAuth
+  i adminApi z pliku app_script.
+-->
+<html lang="pl">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1B6B50">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="PsiApsi">
+  <title>PsiApsi — panel</title>
+  <style>
+    :root {
+      --brand: #1B6B50;
+      --brand-dark: #124F3A;
+      --brand-soft: #E7F3ED;
+      --accent: #D97706;
+      --accent-soft: #FDF3E0;
+      --text: #16211C;
+      --text-soft: #4C5A53;
+      --text-muted: #6B7280;
+      --border: #E7E3DA;
+      --bg: #FAF8F4;
+      --white: #FFFFFF;
+      --danger: #B42318;
+      --danger-soft: #FEF3F2;
+      --radius: 16px;
+      --radius-sm: 10px;
+      --shadow: 0 1px 2px rgba(22,33,28,.05), 0 6px 20px rgba(22,33,28,.05);
+      --font: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    [hidden] { display: none !important; }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+      padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+    }
+
+    button { font-family: inherit; cursor: pointer; }
+    input, textarea, select { font-family: inherit; font-size: 1rem; }
+
+    /* ── Logowanie ────────────────────────────────────────── */
+    .boot { padding: 3rem 1.25rem; text-align: center; color: var(--text-muted); }
+
+    .login {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
+    }
+    .login-card {
+      width: 100%;
+      max-width: 22rem;
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 1.75rem 1.5rem;
+      text-align: center;
+    }
+    .login-logo { font-size: 2.5rem; line-height: 1; }
+    .login-card h1 { font-size: 1.15rem; margin: .6rem 0 .3rem; }
+    .login-card p { font-size: .85rem; color: var(--text-muted); }
+    .login form { margin-top: 1.2rem; display: flex; flex-direction: column; gap: .6rem; }
+    .login input {
+      width: 100%;
+      padding: .85rem 1rem;
+      text-align: center;
+      letter-spacing: .35em;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--bg);
+    }
+    .login input:focus { outline: 2px solid var(--brand); outline-offset: 1px; }
+
+    /* ── Nagłówek i zakładki ──────────────────────────────── */
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .75rem;
+      padding: .85rem 1rem;
+      background: var(--white);
+      border-bottom: 1px solid var(--border);
+    }
+    .topbar strong { font-size: .95rem; }
+    .who { display: block; font-size: .72rem; color: var(--text-muted); }
+
+    .tabs {
+      position: sticky;
+      top: 3.1rem;
+      z-index: 19;
+      display: flex;
+      gap: .35rem;
+      padding: .5rem .75rem;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      overflow-x: auto;
+    }
+    .tab {
+      flex: 1 0 auto;
+      padding: .55rem .9rem;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--white);
+      color: var(--text-soft);
+      font-size: .82rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .tab.is-active { background: var(--brand); border-color: var(--brand); color: #fff; }
+
+    /* ── Układ ────────────────────────────────────────────── */
+    .wrap { max-width: 46rem; margin: 0 auto; padding: 1rem .85rem 2rem; }
+    .lead { font-size: .84rem; color: var(--text-muted); margin-bottom: .9rem; line-height: 1.5; }
+    .section-title { font-size: .95rem; margin: 1.4rem 0 .6rem; }
+    .stack { display: flex; flex-direction: column; gap: .6rem; }
+    .muted { font-size: .8rem; color: var(--text-muted); }
+    .hint { font-size: .76rem; color: var(--text-muted); line-height: 1.45; }
+    .error { color: var(--danger); font-size: .82rem; margin-top: .6rem; min-height: 1.1rem; }
+
+    .card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: .9rem 1rem;
+    }
+    .card-head { margin-bottom: .7rem; }
+    .card-head h2 { font-size: .92rem; }
+    .row { display: flex; flex-wrap: wrap; gap: .6rem; align-items: flex-end; }
+
+    .btn {
+      border: 1px solid transparent;
+      border-radius: var(--radius-sm);
+      padding: .7rem 1rem;
+      font-size: .85rem;
+      font-weight: 600;
+      transition: background .15s, border-color .15s, color .15s;
+    }
+    .btn.primary { background: var(--brand); color: #fff; }
+    .btn.primary:hover { background: var(--brand-dark); }
+    .btn.secondary { background: var(--brand-soft); color: var(--brand-dark); border-color: #CFE6DA; }
+    .btn.ghost { background: transparent; color: var(--text-soft); border-color: var(--border); }
+    .btn.danger { background: var(--danger-soft); color: var(--danger); border-color: #F3D3D0; }
+    .btn.small { padding: .45rem .7rem; font-size: .78rem; }
+    .btn:disabled { opacity: .55; cursor: default; }
+
+    /* ── Pola ─────────────────────────────────────────────── */
+    .field { display: flex; flex-direction: column; gap: .3rem; flex: 1 1 8rem; }
+    .field > span { font-size: .74rem; font-weight: 600; color: var(--text-soft); }
+    .field input, .field textarea, .field select {
+      width: 100%;
+      padding: .6rem .7rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--bg);
+      color: var(--text);
+    }
+    .field textarea { min-height: 4.6rem; resize: vertical; line-height: 1.45; }
+    .field input:focus, .field textarea:focus { outline: 2px solid var(--brand); outline-offset: 1px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+    .check { display: flex; align-items: center; gap: .5rem; font-size: .82rem; color: var(--text-soft); }
+    .check input { width: 1.05rem; height: 1.05rem; accent-color: var(--brand); }
+
+    /* ── Godziny ──────────────────────────────────────────── */
+    .chips { display: flex; flex-wrap: wrap; gap: .35rem; margin: .55rem 0; }
+    .chip {
+      min-width: 3.3rem;
+      padding: .42rem .6rem;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--bg);
+      color: var(--text-soft);
+      font-size: .78rem;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+    .chip.is-on { background: var(--brand); border-color: var(--brand); color: #fff; }
+    .chip-add { border-style: dashed; color: var(--text-muted); font-weight: 500; }
+
+    /* ── Dzień tygodnia ───────────────────────────────────── */
+    .day-card .day-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .6rem;
+      flex-wrap: wrap;
+    }
+    .day-name { font-size: .9rem; font-weight: 600; }
+    .seg { display: flex; border: 1px solid var(--border); border-radius: 999px; overflow: hidden; }
+    .seg button {
+      padding: .38rem .66rem;
+      border: 0;
+      background: var(--white);
+      color: var(--text-soft);
+      font-size: .74rem;
+      font-weight: 600;
+    }
+    .seg button.is-on { background: var(--brand-soft); color: var(--brand-dark); }
+    .seg button + button { border-left: 1px solid var(--border); }
+    .day-note { font-size: .76rem; color: var(--text-muted); margin-top: .4rem; }
+
+    /* ── Wyjątki ──────────────────────────────────────────── */
+    .exception {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .6rem;
+      padding: .6rem .8rem;
+    }
+    .exception-date { font-size: .84rem; font-weight: 600; }
+    .exception-hours { font-size: .78rem; color: var(--text-muted); }
+
+    /* ── Zajęcia ──────────────────────────────────────────── */
+    .service-head { display: flex; align-items: center; justify-content: space-between; gap: .6rem; margin-bottom: .7rem; }
+    .service-title { font-size: .9rem; font-weight: 600; display: flex; align-items: center; gap: .4rem; }
+    .service-title .service-icon { font-size: 1.15rem; }
+
+    /* ── Zapisy ───────────────────────────────────────────── */
+    .day-group-title {
+      font-size: .8rem;
+      font-weight: 700;
+      color: var(--brand-dark);
+      text-transform: capitalize;
+      margin: 1rem 0 .5rem;
+    }
+    .booking-head { display: flex; align-items: baseline; gap: .55rem; flex-wrap: wrap; margin-bottom: .55rem; }
+    .booking-time { font-size: 1rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .booking-service { font-size: .8rem; color: var(--text-soft); }
+    .booking-lines { display: grid; gap: .28rem; font-size: .82rem; line-height: 1.45; }
+    .booking-lines b { font-weight: 600; color: var(--text-soft); }
+    .booking-lines a { color: var(--brand-dark); text-decoration: none; font-weight: 600; }
+    .booking-actions { display: flex; gap: .5rem; margin-top: .7rem; flex-wrap: wrap; }
+    .tag {
+      display: inline-block;
+      padding: .12rem .45rem;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: .7rem;
+      font-weight: 700;
+      margin-left: .35rem;
+    }
+
+    /* ── Pasek zapisu i powiadomienia ─────────────────────── */
+    .savebar {
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .75rem;
+      padding: .7rem .9rem;
+      padding-bottom: calc(.7rem + env(safe-area-inset-bottom));
+      background: var(--white);
+      border-top: 1px solid var(--border);
+      box-shadow: 0 -6px 20px rgba(22,33,28,.06);
+    }
+    .savebar span { font-size: .8rem; color: var(--text-muted); }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: calc(5.2rem + env(safe-area-inset-bottom));
+      transform: translate(-50%, .6rem);
+      z-index: 40;
+      max-width: 22rem;
+      padding: .7rem 1rem;
+      border-radius: var(--radius-sm);
+      background: var(--brand-dark);
+      color: #fff;
+      font-size: .82rem;
+      line-height: 1.4;
+      text-align: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s, transform .2s;
+    }
+    .toast.is-on { opacity: 1; transform: translate(-50%, 0); }
+    .toast.is-error { background: var(--danger); }
+
+    @media (min-width: 620px) {
+      .wrap { padding: 1.4rem 1.25rem 2.5rem; }
+    }
+  </style>
+</head>
+<body>
+  <div id="boot" class="boot">Ładowanie panelu…</div>
+
+  <section id="login" class="login" hidden>
+    <div class="login-card">
+      <div class="login-logo" aria-hidden="true">🐾</div>
+      <h1>Panel PsiApsi</h1>
+      <p>Wpisz PIN, żeby zarządzać grafikiem, ofertą i zapisami.</p>
+      <form id="loginForm">
+        <input id="pin" type="password" inputmode="numeric" autocomplete="current-password"
+               placeholder="PIN" aria-label="PIN" required>
+        <button class="btn primary" type="submit">Wejdź</button>
+      </form>
+      <p id="loginError" class="error" role="alert"></p>
+    </div>
+  </section>
+
+  <div id="app" hidden>
+    <header class="topbar">
+      <div>
+        <strong>Panel PsiApsi</strong>
+        <span id="who" class="who"></span>
+      </div>
+      <button id="logout" class="btn ghost small" type="button">Wyloguj</button>
+    </header>
+
+    <nav class="tabs" role="tablist" aria-label="Sekcje panelu">
+      <button class="tab is-active" data-tab="grafik" type="button" role="tab" aria-selected="true">Grafik</button>
+      <button class="tab" data-tab="uslugi" type="button" role="tab" aria-selected="false">Zajęcia</button>
+      <button class="tab" data-tab="zapisy" type="button" role="tab" aria-selected="false">Zapisy</button>
+    </nav>
+
+    <main class="wrap">
+      <!-- ── Grafik ─────────────────────────────────────────── -->
+      <section data-panel="grafik">
+        <p class="lead">
+          Ustaw godziny, w których przyjmujesz zapisy. Dzień ustawiony na „Domyślne”
+          korzysta z godzin domyślnych, „Własne” ma własną listę, a „Wolne” nie pokazuje
+          na stronie żadnego terminu.
+        </p>
+
+        <div class="card">
+          <div class="card-head">
+            <h2>Godziny domyślne</h2>
+            <p class="hint">Punkt wyjścia dla dni ustawionych na „Domyślne”.</p>
+          </div>
+          <div class="chips" id="chipsDefault"></div>
+        </div>
+
+        <h2 class="section-title">Dni tygodnia</h2>
+        <div id="weekdayList" class="stack"></div>
+
+        <h2 class="section-title">Wyjątki na konkretną datę</h2>
+        <p class="hint">
+          Najwyższy priorytet — nadpisuje dzień tygodnia i godziny domyślne.
+          Świetne na urlop, święto albo jednorazowe zajęcia.
+        </p>
+        <div class="card" style="margin-top:.6rem">
+          <div class="grid-2">
+            <label class="field">
+              <span>Data</span>
+              <input type="date" id="exceptionDate">
+            </label>
+            <div class="field">
+              <span>Wyjątek</span>
+              <label class="check"><input type="checkbox" id="exceptionOff"> Dzień wolny (bez godzin)</label>
+            </div>
+          </div>
+          <div class="chips" id="chipsException"></div>
+          <button class="btn secondary" id="addException" type="button">Dodaj wyjątek dla tej daty</button>
+        </div>
+        <div id="exceptionList" class="stack" style="margin-top:.6rem"></div>
+      </section>
+
+      <!-- ── Zajęcia ────────────────────────────────────────── -->
+      <section data-panel="uslugi" hidden>
+        <p class="lead">
+          Oferta szkoły: to stąd pochodzą kafle wyboru zajęć, cennik i limity psów w grupie.
+          Nazwy muszą być unikalne — po nich rozpoznajemy, kto jest zapisany na te same zajęcia.
+        </p>
+        <p id="uslugiHint" class="hint"></p>
+        <div id="serviceList" class="stack" style="margin-top:.8rem"></div>
+        <button class="btn secondary" id="addService" type="button" style="margin-top:.8rem">+ Dodaj zajęcia</button>
+      </section>
+
+      <!-- ── Zapisy ─────────────────────────────────────────── -->
+      <section data-panel="zapisy" hidden>
+        <p class="lead">Lista zapisów z arkusza. Odwołanie usuwa wiersz i wydarzenie z Kalendarza Google.</p>
+        <div class="card">
+          <div class="row">
+            <label class="field">
+              <span>Od</span>
+              <input type="date" id="fromDate">
+            </label>
+            <label class="field">
+              <span>Do</span>
+              <input type="date" id="toDate">
+            </label>
+            <button class="btn secondary" id="refreshBookings" type="button">Pokaż</button>
+          </div>
+        </div>
+        <p id="bookingsSummary" class="muted" style="margin-top:.8rem"></p>
+        <div id="bookingList" class="stack"></div>
+      </section>
+    </main>
+  </div>
+
+  <div class="savebar" id="savebar" hidden>
+    <span id="savebarText">Masz niezapisane zmiany</span>
+    <button class="btn primary" id="saveBtn" type="button">Zapisz</button>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <noscript><p class="boot">Panel wymaga włączonego JavaScriptu.</p></noscript>
+
+  <script>
+  (function () {
+    'use strict';
+
+    var DAYS = ['Poniedziałek', 'Wtorek', 'Środa', 'Czwartek', 'Piątek', 'Sobota', 'Niedziela'];
+    var BASE_HOURS = (function () {
+      var out = [];
+      for (var h = 7; h <= 21; h++) out.push((h < 10 ? '0' + h : String(h)) + ':00');
+      return out;
+    })();
+    var FALLBACK_DEFAULT = ['18:00', '19:00', '20:00'];
+    var FALLBACK_LOCATION = 'Salka treningowa — Warszawa Wawer';
+    var TOKEN_KEY = 'psiapsi_admin_token';
+    var OFFLINE_MSG = 'Panel działa tylko z adresu …/exec?page=admin (strona w Apps Script).';
+
+    var state = {
+      token: '',
+      tab: 'grafik',
+      grafik: null,
+      uslugi: null,
+      bookings: [],
+      exceptionDraft: [],
+      grafikDirty: false,
+      uslugiDirty: false
+    };
+
+    var el = {};
+    function $(id) { return document.getElementById(id); }
+
+    document.addEventListener('DOMContentLoaded', init);
+
+    function init() {
+      ['boot', 'login', 'loginForm', 'loginError', 'pin', 'app', 'who', 'logout',
+       'savebar', 'savebarText', 'saveBtn', 'toast', 'weekdayList', 'chipsDefault',
+       'exceptionDate', 'exceptionOff', 'chipsException', 'addException', 'exceptionList',
+       'serviceList', 'uslugiHint', 'addService', 'fromDate', 'toDate', 'refreshBookings',
+       'bookingsSummary', 'bookingList'].forEach(function (id) { el[id] = $(id); });
+
+      el.loginForm.addEventListener('submit', onLogin);
+      el.logout.addEventListener('click', onLogout);
+      el.saveBtn.addEventListener('click', onSave);
+      el.addException.addEventListener('click', onAddException);
+      el.exceptionOff.addEventListener('change', syncExceptionOffState);
+      el.addService.addEventListener('click', onAddService);
+      el.refreshBookings.addEventListener('click', onRefreshBookings);
+
+      Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (tab) {
+        tab.addEventListener('click', function () { switchTab(tab.dataset.tab); });
+      });
+
+      var today = new Date();
+      el.fromDate.value = iso(today);
+      el.toDate.value = iso(addDays(today, 14));
+
+      if (!hasRunner()) {
+        showLogin();
+        showError(OFFLINE_MSG);
+        return;
+      }
+
+      state.token = readToken();
+      if (state.token) {
+        enterApp();
+      } else {
+        showLogin();
+      }
+    }
+
+    /* ── Połączenie z Apps Script ─────────────────────────── */
+
+    function hasRunner() {
+      return !!(window.google && window.google.script && window.google.script.run);
+    }
+
+    function call(action, payload) {
+      return new Promise(function (resolve, reject) {
+        if (!hasRunner()) { reject(new Error(OFFLINE_MSG)); return; }
+
+        window.google.script.run
+          .withSuccessHandler(function (res) {
+            res = res || {};
+            if (res.status === 'error') {
+              if (res.code === 'auth') {
+                forgetToken();
+                showLogin();
+                showError(res.message || 'Sesja wygasła.');
+              }
+              reject(new Error(res.message || 'Nie udało się wykonać operacji.'));
+              return;
+            }
+            resolve(res);
+          })
+          .withFailureHandler(function (err) {
+            reject(new Error((err && err.message) || 'Błąd połączenia z serwerem.'));
+          })
+          .adminApi({ action: action, token: state.token, payload: payload || {} });
+      });
+    }
+
+    function auth(pin) {
+      return new Promise(function (resolve, reject) {
+        if (!hasRunner()) { reject(new Error(OFFLINE_MSG)); return; }
+
+        window.google.script.run
+          .withSuccessHandler(function (res) {
+            if (!res || res.status !== 'success') {
+              reject(new Error((res && res.message) || 'Nie udało się zalogować.'));
+              return;
+            }
+            resolve(res);
+          })
+          .withFailureHandler(function (err) {
+            reject(new Error((err && err.message) || 'Błąd połączenia z serwerem.'));
+          })
+          .adminAuth(pin);
+      });
+    }
+
+    function readToken() {
+      try { return localStorage.getItem(TOKEN_KEY) || ''; } catch (e) { return ''; }
+    }
+    function saveToken(token) {
+      try { localStorage.setItem(TOKEN_KEY, token); } catch (e) { /* tryb prywatny */ }
+    }
+    function forgetToken() {
+      state.token = '';
+      try { localStorage.removeItem(TOKEN_KEY); } catch (e) { /* ignorujemy */ }
+    }
+
+    /* ── Logowanie ────────────────────────────────────────── */
+
+    function showLogin(message) {
+      el.boot.hidden = true;
+      el.app.hidden = true;
+      el.savebar.hidden = true;
+      el.login.hidden = false;
+      el.loginError.textContent = message || '';
+      if (el.pin) el.pin.value = '';
+    }
+
+    function enterApp() {
+      el.boot.hidden = true;
+      el.login.hidden = true;
+      el.app.hidden = false;
+      loadGrafik();
+      loadUslugi();
+    }
+
+    function showError(message) {
+      el.loginError.textContent = message || '';
+    }
+
+    function onLogin(e) {
+      e.preventDefault();
+      var pin = String(el.pin.value || '').trim();
+      if (!pin) return;
+
+      el.loginError.textContent = 'Sprawdzam…';
+      auth(pin).then(function (res) {
+        el.loginError.textContent = '';
+        state.token = res.token;
+        saveToken(res.token);
+        el.who.textContent = res.email || '';
+        enterApp();
+      }).catch(function (err) {
+        state.token = '';
+        showError(err.message);
+      });
+    }
+
+    function onLogout() {
+      forgetToken();
+      state.grafik = null;
+      state.uslugi = null;
+      state.grafikDirty = false;
+      state.uslugiDirty = false;
+      updateSavebar();
+      showLogin('');
+    }
+
+    /* ── Zakładki ─────────────────────────────────────────── */
+
+    function switchTab(tab) {
+      state.tab = tab;
+      Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (btn) {
+        var active = btn.dataset.tab === tab;
+        btn.classList.toggle('is-active', active);
+        btn.setAttribute('aria-selected', active ? 'true' : 'false');
+      });
+      Array.prototype.forEach.call(document.querySelectorAll('[data-panel]'), function (panel) {
+        panel.hidden = panel.dataset.panel !== tab;
+      });
+      updateSavebar();
+      if (tab === 'zapisy') loadBookings();
+    }
+
+    function updateSavebar() {
+      var dirty = (state.tab === 'grafik' && state.grafikDirty)
+        || (state.tab === 'uslugi' && state.uslugiDirty);
+
+      el.savebar.hidden = !dirty;
+      if (dirty) {
+        el.savebarText.textContent = state.tab === 'grafik'
+          ? 'Grafik ma niezapisane zmiany'
+          : 'Oferta ma niezapisane zmiany';
+      }
+    }
+
+    function markDirty(which) {
+      if (which === 'grafik') state.grafikDirty = true;
+      if (which === 'uslugi') state.uslugiDirty = true;
+      updateSavebar();
+    }
+
+    function onSave() {
+      var work = state.tab === 'uslugi' ? saveUslugi() : saveGrafik();
+      el.saveBtn.disabled = true;
+      work.then(function () {
+        el.saveBtn.disabled = false;
+      }).catch(function (err) {
+        el.saveBtn.disabled = false;
+        toast(err.message, true);
+      });
+    }
+
+    /* ── Grafik ───────────────────────────────────────────── */
+
+    function loadGrafik() {
+      return call('grafik').then(function (res) {
+        state.grafik = {
+          'default': (res['default'] || FALLBACK_DEFAULT).slice(),
+          weekdays: res.weekdays || {},
+          dates: res.dates || [],
+          extraRows: res.extraRows || []
+        };
+        state.grafikDirty = false;
+        state.exceptionDraft = adminDefaultHours();
+        renderGrafik();
+        updateSavebar();
+      }).catch(function (err) {
+        toast(err.message, true);
+      });
+    }
+
+    function renderGrafik() {
+      if (!state.grafik) return;
+
+      renderChips(el.chipsDefault, state.grafik['default'], function (hour) {
+        toggleInList(state.grafik['default'], hour);
+        markDirty('grafik');
+        renderGrafik();
+      }, function () {
+        var custom = askForHour();
+        if (!custom) return;
+        if (state.grafik['default'].indexOf(custom) === -1) {
+          state.grafik['default'].push(custom);
+          sortHours(state.grafik['default']);
+          markDirty('grafik');
+          renderGrafik();
+        }
+      });
+
+      renderExceptionChips();
+      renderWeekdays();
+      renderExceptions();
+    }
+
+    // Godziny proponowane dla nowego wyjątku — „Dzień wolny” nadpisuje je przy dodawaniu.
+    function renderExceptionChips() {
+      renderChips(el.chipsException, state.exceptionDraft, function (hour) {
+        toggleInList(state.exceptionDraft, hour);
+        el.exceptionOff.checked = false;
+        renderExceptionChips();
+        syncExceptionOffState();
+      }, function () {
+        var custom = askForHour();
+        if (!custom) return;
+        if (state.exceptionDraft.indexOf(custom) === -1) {
+          state.exceptionDraft.push(custom);
+          sortHours(state.exceptionDraft);
+        }
+        renderExceptionChips();
+      });
+
+      syncExceptionOffState();
+    }
+
+    // Przy zaznaczonym „Dniu wolnym” wybrane godziny nie mają znaczenia.
+    function syncExceptionOffState() {
+      var off = el.exceptionOff.checked;
+      el.chipsException.style.opacity = off ? '.4' : '';
+      el.chipsException.style.pointerEvents = off ? 'none' : '';
+    }
+
+    function renderWeekdays() {
+      el.weekdayList.innerHTML = '';
+
+      DAYS.forEach(function (name) {
+        var key = name.toLowerCase();
+        var hasEntry = Object.prototype.hasOwnProperty.call(state.grafik.weekdays, key);
+        var hours = hasEntry ? state.grafik.weekdays[key] : [];
+        var mode = !hasEntry ? 'default' : (hours.length ? 'custom' : 'off');
+
+        var card = document.createElement('div');
+        card.className = 'card day-card';
+
+        var head = document.createElement('div');
+        head.className = 'day-head';
+
+        var label = document.createElement('span');
+        label.className = 'day-name';
+        label.textContent = name;
+        head.appendChild(label);
+
+        var seg = document.createElement('div');
+        seg.className = 'seg';
+        [['default', 'Domyślne'], ['custom', 'Własne'], ['off', 'Wolne']].forEach(function (pair) {
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.textContent = pair[1];
+          btn.className = mode === pair[0] ? 'is-on' : '';
+          btn.setAttribute('aria-pressed', mode === pair[0] ? 'true' : 'false');
+          btn.addEventListener('click', function () { setDayMode(key, pair[0]); });
+          seg.appendChild(btn);
+        });
+        head.appendChild(seg);
+        card.appendChild(head);
+
+        if (mode === 'custom') {
+          var chips = document.createElement('div');
+          chips.className = 'chips';
+          renderChips(chips, hours, function (hour) {
+            toggleInList(state.grafik.weekdays[key], hour);
+            markDirty('grafik');
+            renderWeekdays();
+          }, function () {
+            var custom = askForHour();
+            if (!custom) return;
+            if (state.grafik.weekdays[key].indexOf(custom) === -1) {
+              state.grafik.weekdays[key].push(custom);
+              sortHours(state.grafik.weekdays[key]);
+              markDirty('grafik');
+              renderWeekdays();
+            }
+          });
+          card.appendChild(chips);
+        } else {
+          var note = document.createElement('p');
+          note.className = 'day-note';
+          note.textContent = mode === 'default'
+            ? 'Korzysta z godzin domyślnych: ' + (state.grafik['default'].join(', ') || 'brak')
+            : 'Dzień wolny — strona nie pokaże wtedy żadnego terminu.';
+          card.appendChild(note);
+        }
+
+        el.weekdayList.appendChild(card);
+      });
+    }
+
+    function setDayMode(key, mode) {
+      if (mode === 'default') {
+        delete state.grafik.weekdays[key];
+      } else if (mode === 'off') {
+        state.grafik.weekdays[key] = [];
+      } else {
+        var current = state.grafik.weekdays[key];
+        state.grafik.weekdays[key] = (current && current.length)
+          ? current.slice()
+          : state.grafik['default'].slice();
+      }
+      markDirty('grafik');
+      renderWeekdays();
+    }
+
+    function renderExceptions() {
+      el.exceptionList.innerHTML = '';
+
+      if (!state.grafik.dates.length) {
+        var empty = document.createElement('p');
+        empty.className = 'muted';
+        empty.textContent = 'Brak wyjątków — obowiązuje zwykły grafik tygodnia.';
+        el.exceptionList.appendChild(empty);
+        return;
+      }
+
+      state.grafik.dates.forEach(function (entry) {
+        var card = document.createElement('div');
+        card.className = 'card exception';
+
+        var info = document.createElement('div');
+        var dateLine = document.createElement('div');
+        dateLine.className = 'exception-date';
+        dateLine.textContent = formatDayPL(entry.date);
+        var hoursLine = document.createElement('div');
+        hoursLine.className = 'exception-hours';
+        hoursLine.textContent = entry.hours.length ? entry.hours.join(', ') : 'dzień wolny';
+        info.appendChild(dateLine);
+        info.appendChild(hoursLine);
+        card.appendChild(info);
+
+        var remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'btn danger small';
+        remove.textContent = 'Usuń';
+        remove.addEventListener('click', function () {
+          state.grafik.dates = state.grafik.dates.filter(function (d) { return d.date !== entry.date; });
+          markDirty('grafik');
+          renderExceptions();
+        });
+        card.appendChild(remove);
+
+        el.exceptionList.appendChild(card);
+      });
+    }
+
+    function onAddException() {
+      var date = String(el.exceptionDate.value || '').trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        toast('Wybierz datę wyjątku.', true);
+        return;
+      }
+
+      var hours = el.exceptionOff.checked ? [] : state.exceptionDraft.slice();
+      if (!hours.length && !el.exceptionOff.checked) {
+        toast('Zaznacz godziny albo wybierz „Dzień wolny”.', true);
+        return;
+      }
+      sortHours(hours);
+
+      var existing = state.grafik.dates.filter(function (d) { return d.date === date; })[0];
+      if (existing) {
+        existing.hours = hours;
+      } else {
+        state.grafik.dates.push({ date: date, hours: hours });
+        state.grafik.dates.sort(function (a, b) { return a.date < b.date ? -1 : 1; });
+      }
+
+      el.exceptionDate.value = '';
+      el.exceptionOff.checked = false;
+      state.exceptionDraft = adminDefaultHours();
+      renderExceptionChips();
+      markDirty('grafik');
+      renderExceptions();
+    }
+
+    function adminDefaultHours() {
+      return (state.grafik && state.grafik['default'].length)
+        ? state.grafik['default'].slice()
+        : FALLBACK_DEFAULT.slice();
+    }
+
+    function saveGrafik() {
+      return call('saveGrafik', {
+        'default': state.grafik['default'],
+        weekdays: state.grafik.weekdays,
+        dates: state.grafik.dates,
+        extraRows: state.grafik.extraRows
+      }).then(function () {
+        state.grafikDirty = false;
+        updateSavebar();
+        toast('Grafik zapisany — strona pokaże go od razu.');
+      });
+    }
+
+    /* ── Oferta ───────────────────────────────────────────── */
+
+    function loadUslugi() {
+      return call('uslugi').then(function (res) {
+        state.uslugi = { exists: !!res.exists, services: res.services || [] };
+        state.uslugiDirty = false;
+
+        el.uslugiHint.textContent = state.uslugi.exists
+          ? 'Te zajęcia są teraz widoczne na stronie.'
+          : 'Zakładka „Uslugi” jeszcze nie istnieje w arkuszu. Pierwszy zapis utworzy ją wraz z tą ofertą.';
+
+        renderServices();
+        updateSavebar();
+      }).catch(function (err) {
+        toast(err.message, true);
+      });
+    }
+
+    function renderServices() {
+      el.serviceList.innerHTML = '';
+
+      state.uslugi.services.forEach(function (svc, index) {
+        var card = document.createElement('div');
+        card.className = 'card';
+
+        var head = document.createElement('div');
+        head.className = 'service-head';
+
+        var title = document.createElement('span');
+        title.className = 'service-title';
+        title.innerHTML = '<span class="service-icon"></span><span class="service-name"></span>';
+        title.querySelector('.service-icon').textContent = svc.icon || '🐾';
+        title.querySelector('.service-name').textContent = svc.name || 'Zajęcia bez nazwy';
+        if (svc.is1on1) {
+          var tag = document.createElement('span');
+          tag.className = 'tag';
+          tag.textContent = '1-1';
+          title.appendChild(tag);
+        }
+        head.appendChild(title);
+
+        var remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'btn danger small';
+        remove.textContent = 'Usuń';
+        remove.addEventListener('click', function () {
+          if (!window.confirm('Usunąć zajęcia „' + (svc.name || '') + '” z oferty?')) return;
+          state.uslugi.services.splice(index, 1);
+          markDirty('uslugi');
+          renderServices();
+        });
+        head.appendChild(remove);
+        card.appendChild(head);
+
+        var nameField = field('Nazwa', 'text', svc.name, function (value) {
+          svc.name = value;
+          markDirty('uslugi');
+        });
+
+        var iconField = field('Ikona (emoji)', 'text', svc.icon, function (value) {
+          svc.icon = value;
+        });
+        iconField.querySelector('input').setAttribute('maxlength', '4');
+
+        var descField = field('Krótki opis', 'text', svc.desc, function (value) {
+          svc.desc = value;
+        });
+
+        card.appendChild(nameField);
+        card.appendChild(iconField);
+        card.appendChild(descField);
+
+        var grid = document.createElement('div');
+        grid.className = 'grid-2';
+        grid.appendChild(field('Maks. psów w grupie', 'number', svc.maxDogs, function (value) {
+          var parsed = parseInt(value, 10);
+          svc.maxDogs = isNaN(parsed) || parsed < 1 ? 1 : parsed;
+          if (svc.maxDogs === 1) svc.is1on1 = true;
+        }, { min: '1' }));
+
+        var priceWrapper = document.createElement('div');
+        priceWrapper.appendChild(field('Cena (np. 80 zł)', 'text', svc.price, function (value) {
+          svc.price = value;
+        }));
+        grid.appendChild(priceWrapper);
+        card.appendChild(grid);
+
+        card.appendChild(field('Czas trwania (np. 60 min)', 'text', svc.duration, function (value) {
+          svc.duration = value;
+        }));
+
+        card.appendChild(areaField('Miejsca spotkania (jedno w linii)', svc.locations, function (value) {
+          svc.locations = splitLines(value);
+        }));
+
+        var check = document.createElement('label');
+        check.className = 'check';
+        var box = document.createElement('input');
+        box.type = 'checkbox';
+        box.checked = !!svc.is1on1;
+        box.addEventListener('change', function () {
+          svc.is1on1 = box.checked;
+          if (box.checked && svc.maxDogs > 1) svc.maxDogs = 1;
+          markDirty('uslugi');
+          renderServices();
+        });
+        check.appendChild(box);
+        check.appendChild(document.createTextNode('Zajęcia indywidualne (blokują cały termin)'));
+        card.appendChild(check);
+
+        card.appendChild(areaField('Co w cenie (jedna pozycja w linii)', svc.features, function (value) {
+          svc.features = splitLines(value);
+        }));
+
+        el.serviceList.appendChild(card);
+      });
+    }
+
+    function onAddService() {
+      state.uslugi.services.push({
+        name: 'Nowe zajęcia',
+        icon: '🐾',
+        desc: '',
+        maxDogs: 4,
+        is1on1: false,
+        locations: [FALLBACK_LOCATION],
+        price: '',
+        duration: '',
+        features: []
+      });
+      markDirty('uslugi');
+      renderServices();
+    }
+
+    function saveUslugi() {
+      return call('saveUslugi', { services: state.uslugi.services }).then(function () {
+        state.uslugi.exists = true;
+        state.uslugiDirty = false;
+        updateSavebar();
+        toast('Oferta zapisana — strona pokaże ją od razu.');
+      });
+    }
+
+    /* ── Zapisy ───────────────────────────────────────────── */
+
+    function loadBookings() {
+      return call('rezerwacje', {
+        from: String(el.fromDate.value || ''),
+        to: String(el.toDate.value || '')
+      }).then(function (res) {
+        state.bookings = res.bookings || [];
+        renderBookings();
+      }).catch(function (err) {
+        toast(err.message, true);
+      });
+    }
+
+    function onRefreshBookings(e) {
+      if (e) e.preventDefault();
+      loadBookings();
+    }
+
+    function renderBookings() {
+      el.bookingList.innerHTML = '';
+
+      if (!state.bookings.length) {
+        el.bookingsSummary.textContent = 'Brak zapisów w wybranym okresie.';
+        return;
+      }
+
+      el.bookingsSummary.textContent = state.bookings.length === 1
+        ? '1 zapis w wybranym okresie'
+        : state.bookings.length + ' zapisów w wybranym okresie';
+
+      var currentDate = '';
+      state.bookings.forEach(function (booking) {
+        if (booking.date !== currentDate) {
+          currentDate = booking.date;
+          var groupTitle = document.createElement('h3');
+          groupTitle.className = 'day-group-title';
+          groupTitle.textContent = formatDayPL(booking.date);
+          el.bookingList.appendChild(groupTitle);
+        }
+
+        var card = document.createElement('div');
+        card.className = 'card';
+
+        var head = document.createElement('div');
+        head.className = 'booking-head';
+        var time = document.createElement('span');
+        time.className = 'booking-time';
+        time.textContent = booking.time;
+        var service = document.createElement('span');
+        service.className = 'booking-service';
+        service.textContent = booking.service + (booking.location ? ' · ' + booking.location : '');
+        head.appendChild(time);
+        head.appendChild(service);
+        card.appendChild(head);
+
+        var lines = document.createElement('div');
+        lines.className = 'booking-lines';
+        lines.appendChild(line('Pies', booking.dogName
+          + (booking.dogAge ? ' (' + booking.dogAge + ' lat)' : '')
+          + (booking.dogGender ? ', ' + booking.dogGender : '')));
+        lines.appendChild(line('Opiekun', booking.firstName + ' ' + booking.lastName));
+        lines.appendChild(line('Telefon', booking.phone, 'tel'));
+        lines.appendChild(line('E-mail', booking.email, 'mailto'));
+        if (booking.sociability) lines.appendChild(line('Inne psy', booking.sociability));
+        if (booking.notes) lines.appendChild(line('Uwagi', booking.notes));
+        card.appendChild(lines);
+
+        var actions = document.createElement('div');
+        actions.className = 'booking-actions';
+
+        var call2 = document.createElement('a');
+        call2.className = 'btn secondary small';
+        call2.textContent = 'Zadzwoń';
+        call2.href = booking.phone ? 'tel:' + booking.phone.replace(/\s+/g, '') : '#';
+        if (!booking.phone) call2 = null;
+
+        if (call2) actions.appendChild(call2);
+
+        var cancel = document.createElement('button');
+        cancel.type = 'button';
+        cancel.className = 'btn danger small';
+        cancel.textContent = 'Odwołaj zapis';
+        cancel.addEventListener('click', function () { cancelBooking(booking, cancel); });
+        actions.appendChild(cancel);
+
+        card.appendChild(actions);
+        el.bookingList.appendChild(card);
+      });
+    }
+
+    function cancelBooking(booking, button) {
+      var question = 'Odwołać zapis?\n\n' + formatDayPL(booking.date) + ', godz. ' + booking.time
+        + '\n' + booking.service + '\n' + booking.dogName + ' (' + booking.firstName + ' ' + booking.lastName + ')';
+      if (!window.confirm(question)) return;
+
+      button.disabled = true;
+      call('cancelBooking', { row: booking.row, date: booking.date, time: booking.time })
+        .then(function (res) {
+          toast(res.calendarRemoved
+            ? 'Zapis odwołany, wydarzenie usunięte z Kalendarza.'
+            : 'Zapis odwołany. Sprawdź Kalendarz Google — wydarzenia nie udało się dopasować.');
+          return loadBookings();
+        })
+        .catch(function (err) {
+          button.disabled = false;
+          toast(err.message, true);
+        });
+    }
+
+    /* ── Drobiazgi ────────────────────────────────────────── */
+
+    function field(labelText, type, value, onChange, extra) {
+      var wrap = document.createElement('label');
+      wrap.className = 'field';
+      var label = document.createElement('span');
+      label.textContent = labelText;
+      var input = document.createElement('input');
+      input.type = type;
+      input.value = value === undefined || value === null ? '' : String(value);
+      if (extra && extra.min) input.min = extra.min;
+      input.addEventListener('input', function () { onChange(input.value); });
+      wrap.appendChild(label);
+      wrap.appendChild(input);
+      return wrap;
+    }
+
+    function areaField(labelText, list, onChange) {
+      var wrap = document.createElement('label');
+      wrap.className = 'field';
+      var label = document.createElement('span');
+      label.textContent = labelText;
+      var area = document.createElement('textarea');
+      area.value = (list || []).join('\n');
+      area.addEventListener('input', function () { onChange(area.value); });
+      wrap.appendChild(label);
+      wrap.appendChild(area);
+      return wrap;
+    }
+
+    function line(labelText, value, linkKind) {
+      var row = document.createElement('div');
+      var strong = document.createElement('b');
+      strong.textContent = labelText + ': ';
+      row.appendChild(strong);
+
+      var text = String(value || '').trim();
+      if (!text) {
+        row.appendChild(document.createTextNode('—'));
+        return row;
+      }
+
+      if (linkKind === 'tel' || (linkKind === 'mailto' && text.indexOf('@') !== -1)) {
+        var a = document.createElement('a');
+        a.href = (linkKind === 'tel' ? 'tel:' : 'mailto:') + text.replace(/\s+/g, '');
+        a.textContent = text;
+        row.appendChild(a);
+      } else {
+        row.appendChild(document.createTextNode(text));
+      }
+      return row;
+    }
+
+    function renderChips(container, selected, onToggle, onAdd) {
+      container.innerHTML = '';
+
+      uniqueSorted(BASE_HOURS.concat(selected || [])).forEach(function (hour) {
+        var isOn = (selected || []).indexOf(hour) !== -1;
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'chip' + (isOn ? ' is-on' : '');
+        btn.textContent = hour;
+        btn.dataset.hour = hour;
+        btn.setAttribute('aria-pressed', isOn ? 'true' : 'false');
+        btn.addEventListener('click', function () { onToggle(hour); });
+        container.appendChild(btn);
+      });
+
+      if (onAdd) {
+        var add = document.createElement('button');
+        add.type = 'button';
+        add.className = 'chip chip-add';
+        add.textContent = '+ inna';
+        add.addEventListener('click', onAdd);
+        container.appendChild(add);
+      }
+    }
+
+    function askForHour() {
+      var answer = window.prompt('Godzina w formacie HH:MM (np. 11:30):', '');
+      if (!answer) return '';
+      var match = String(answer).trim().match(/^(\d{1,2}):(\d{2})$/);
+      if (!match) {
+        toast('Nie rozpoznałem godziny. Podaj format HH:MM, np. 11:30.', true);
+        return '';
+      }
+      var h = parseInt(match[1], 10);
+      var m = parseInt(match[2], 10);
+      if (h > 23 || m > 59) {
+        toast('Godzina poza zakresem.', true);
+        return '';
+      }
+      return (h < 10 ? '0' + h : String(h)) + ':' + match[2];
+    }
+
+    function toggleInList(list, hour) {
+      var index = list.indexOf(hour);
+      if (index === -1) {
+        list.push(hour);
+        sortHours(list);
+      } else {
+        list.splice(index, 1);
+      }
+    }
+
+    function sortHours(list) {
+      list.sort(function (a, b) { return minutes(a) - minutes(b); });
+    }
+
+    function uniqueSorted(list) {
+      var seen = {};
+      var out = [];
+      (list || []).forEach(function (hour) {
+        if (!hour || seen[hour]) return;
+        seen[hour] = true;
+        out.push(hour);
+      });
+      return out.sort(function (a, b) { return minutes(a) - minutes(b); });
+    }
+
+    function minutes(hour) {
+      var parts = String(hour || '').split(':');
+      return (parseInt(parts[0], 10) || 0) * 60 + (parseInt(parts[1], 10) || 0);
+    }
+
+    function splitLines(value) {
+      return String(value || '')
+        .split(/[\n;]+/)
+        .map(function (chunk) { return chunk.trim(); })
+        .filter(Boolean);
+    }
+
+    function pad(value) { return value < 10 ? '0' + value : String(value); }
+    function iso(date) { return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()); }
+    function addDays(date, days) {
+      var copy = new Date(date);
+      copy.setDate(copy.getDate() + days);
+      return copy;
+    }
+
+    function formatDayPL(dateISO) {
+      var parts = String(dateISO || '').split('-');
+      if (parts.length !== 3) return dateISO;
+      var date = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+      try {
+        return new Intl.DateTimeFormat('pl-PL', {
+          weekday: 'long', day: 'numeric', month: 'long'
+        }).format(date);
+      } catch (e) {
+        return dateISO;
+      }
+    }
+
+    var toastTimer = null;
+    function toast(message, isError) {
+      el.toast.textContent = message;
+      el.toast.classList.toggle('is-error', !!isError);
+      el.toast.classList.add('is-on');
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(function () { el.toast.classList.remove('is-on'); }, 4000);
+    }
+  })();
+  </script>
+</body>
+</html>
