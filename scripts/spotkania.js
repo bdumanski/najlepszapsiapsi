@@ -261,6 +261,54 @@ function getServicesWithSlotsOn(dateISO) {
     .map(srv => srv.name);
 }
 
+// Godziny, których nie widzi klient przy wybranych zajęciach — z nazwami zajęć,
+// które się wtedy odbywają. `visibleHours` to godziny już pokazane w kolumnie dnia.
+function getOtherServiceHours(dateISO, visibleHours) {
+  const entry = getScheduleEntry(dateISO);
+  const visible = visibleHours || [];
+
+  return entry.hours
+    .filter(hour => visible.indexOf(hour) === -1)
+    .map(hour => ({
+      hour: hour,
+      services: availableServices
+        .filter(srv => isServiceAvailableAt(dateISO, hour, srv.name))
+        .map(srv => srv.name)
+    }))
+    .filter(slot => slot.services.length > 0);
+}
+
+// Łączy godziny z tym samym zestawem zajęć: 18:00, 19:00, 20:00 → „18:00–20:00”.
+function groupOtherHours(otherHours) {
+  const groups = [];
+  const byKey = {};
+
+  otherHours.forEach(slot => {
+    const key = slot.services.join('|');
+    if (!byKey[key]) {
+      byKey[key] = { services: slot.services, hours: [] };
+      groups.push(byKey[key]);
+    }
+    byKey[key].hours.push(slot.hour);
+  });
+
+  groups.forEach(group => {
+    group.hours.sort(compareHours);
+    group.label = group.hours.length > 1 && areHoursConsecutive(group.hours)
+      ? group.hours[0] + '–' + group.hours[group.hours.length - 1]
+      : group.hours.join(', ');
+  });
+
+  return groups;
+}
+
+function areHoursConsecutive(hours) {
+  for (let i = 1; i < hours.length; i++) {
+    if (timeToMinutes(hours[i]) - timeToMinutes(hours[i - 1]) !== 60) return false;
+  }
+  return true;
+}
+
 // Najczęstszy zestaw zajęć w widocznym tygodniu. Dni, które się od niego różnią,
 // to wyjątki (np. jednorazowa salka) — tylko tam warto tłumaczyć „tylko…” ,
 // inaczej cała siatka zamienia się w ścianę podpowiedzi.
@@ -765,16 +813,19 @@ function renderCalendar() {
     const dayDate = new Date(currentMonday);
     dayDate.setDate(dayDate.getDate() + i);
     const dateStr = formatDateISO(dayDate);
+    const hours = getHoursForDay(dayDate, i).slice().sort(compareHours);
     const allServices = getServicesWithSlotsOn(dateStr);
+    const isUnusual = allServices.join('|') !== background;
+
     days.push({
       index:   i,
       date:    dayDate,
       dateStr: dateStr,
       today:   isToday(dayDate),
-      hours:   getHoursForDay(dayDate, i).slice().sort(compareHours),
+      hours:   hours,
       allServices: allServices,
-      isUnusual:   allServices.join('|') !== background,
-      otherServices: allServices.filter(name => name !== selectedService)
+      isUnusual:   isUnusual,
+      otherGroups: isUnusual ? groupOtherHours(getOtherServiceHours(dateStr, hours)) : []
     });
   }
 
@@ -784,9 +835,7 @@ function renderCalendar() {
   studioGrid.innerHTML = '';
 
   days.forEach(day => {
-    const onlyOtherServices = day.hours.length === 0
-      && day.otherServices.length > 0
-      && day.isUnusual;
+    const onlyOtherServices = day.hours.length === 0 && day.otherGroups.length > 0;
 
     const col = document.createElement('div');
     col.className = 's-day-col'
@@ -804,7 +853,7 @@ function renderCalendar() {
     col.appendChild(hdr);
 
     if (onlyOtherServices) {
-      col.appendChild(buildOtherServicesHint(day));
+      col.appendChild(buildOtherHoursHint(day, 'tylko'));
     } else if (day.hours.length === 0) {
       // Dzień bez terminów — jedna kreska zamiast pustej kolumny
       const off = document.createElement('span');
@@ -816,6 +865,12 @@ function renderCalendar() {
       day.hours.forEach((hour, rowIndex) => {
         col.appendChild(buildSlot(day, hour, rowIndex, activeServiceObj));
       });
+
+      // Ten sam dzień może mieć też godziny na inne zajęcia (np. rano salka,
+      // wieczorem spacery) — pokazujemy je pod slotami, zamiast je ukrywać.
+      if (day.otherGroups.length) {
+        col.appendChild(buildOtherHoursHint(day, 'także'));
+      }
     }
 
     studioGrid.appendChild(col);
@@ -826,32 +881,27 @@ function renderCalendar() {
   updateMobileView();
 }
 
-// Dzień, w którym wybrane zajęcia nie mają terminów, ale inne mają.
-// Zamiast kreski pokazujemy, co się tego dnia dzieje — kliknięcie przełącza zajęcia.
-function buildOtherServicesHint(day) {
+// Terminy na inne zajęcia w tym samym dniu. „tylko” — gdy wybrane zajęcia nie mają
+// wtedy nic, „także” — gdy mają, ale dzień zawiera też inne godziny.
+// Kliknięcie nazwy przełącza zajęcia, więc klient od razu widzi te terminy w siatce.
+function buildOtherHoursHint(day, labelText) {
   const wrap = document.createElement('div');
-  wrap.className = 's-slot-hint';
-
-  // Godziny, w których odbywają się te inne zajęcia — w tym dniu mogą być inne niż reszta tygodnia.
-  const entry = getScheduleEntry(day.dateStr);
-  const otherHours = entry.hours.filter(hour =>
-    day.otherServices.some(name => isServiceAvailableAt(day.dateStr, hour, name))
-  );
+  wrap.className = 's-slot-hint' + (day.hours.length ? ' s-slot-hint--inline' : '');
 
   const label = document.createElement('span');
   label.className = 's-slot-hint-label';
-  label.textContent = otherHours.length ? 'tylko ' + otherHours.join(', ') : 'tylko';
+  label.textContent = labelText;
   wrap.appendChild(label);
 
-  day.otherServices.forEach(name => {
+  day.otherGroups.forEach(group => {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 's-slot-hint-btn';
-    btn.textContent = name;
-    btn.setAttribute('aria-label', `Pokaż terminy: ${name}, ${getPolishDayName(day.date)} ${formatDatePL(day.date)}`);
+    btn.textContent = group.label + ' · ' + group.services.join(', ');
+    btn.setAttribute('aria-label', `Pokaż terminy: ${group.services.join(', ')} o ${group.label}, ${getPolishDayName(day.date)} ${formatDatePL(day.date)}`);
     btn.addEventListener('click', () => {
       const tile = Array.from(document.querySelectorAll('.s-service-btn'))
-        .find(b => b.dataset.service === name);
+        .find(b => b.dataset.service === group.services[0]);
       if (tile) tile.click();
     });
     wrap.appendChild(btn);

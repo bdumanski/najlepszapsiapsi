@@ -150,6 +150,50 @@
     .card-head h2 { font-size: .92rem; }
     .row { display: flex; flex-wrap: wrap; gap: .6rem; align-items: flex-end; }
 
+    /* ── Podsumowanie zarobków ────────────────────────────── */
+    .earnings { margin-bottom: 1rem; }
+    .earnings-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+      gap: .55rem;
+    }
+    .earnings-item {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: .55rem .65rem;
+    }
+    .earnings-item.is-total { background: var(--brand-soft); border-color: #CFE6DA; }
+    .earnings-label {
+      display: block;
+      font-size: .62rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      color: var(--text-muted);
+    }
+    .earnings-value {
+      display: block;
+      margin-top: .18rem;
+      font-size: 1.05rem;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+    .earnings-value.is-brand { color: var(--brand-dark); }
+    .earnings-meta { display: block; margin-top: .1rem; font-size: .68rem; color: var(--text-muted); }
+    .earnings-note { margin-top: .55rem; font-size: .72rem; line-height: 1.45; color: var(--text-muted); }
+    .earnings-note.is-warn { color: #8A5A00; }
+    .earnings-breakdown { margin-top: .55rem; }
+    .earnings-breakdown summary {
+      cursor: pointer;
+      font-size: .74rem;
+      font-weight: 600;
+      color: var(--brand-dark);
+    }
+    .earnings-list { margin-top: .45rem; display: flex; flex-direction: column; gap: .25rem; font-size: .76rem; }
+    .earnings-line { display: flex; justify-content: space-between; gap: .75rem; color: var(--text-soft); }
+    .earnings-line b { font-weight: 600; white-space: nowrap; }
+
     .btn {
       border: 1px solid transparent;
       border-radius: var(--radius-sm);
@@ -341,6 +385,32 @@
     </nav>
 
     <main class="wrap">
+      <!-- ── Podsumowanie zarobków ─────────────────────────── -->
+      <section class="card earnings" id="earnings" aria-label="Podsumowanie zarobków">
+        <div class="earnings-grid">
+          <div class="earnings-item">
+            <span class="earnings-label">Zarobione</span>
+            <strong class="earnings-value" id="earnDone">—</strong>
+            <span class="earnings-meta" id="earnDoneMeta">odbyte zajęcia</span>
+          </div>
+          <div class="earnings-item">
+            <span class="earnings-label">Zaplanowane</span>
+            <strong class="earnings-value" id="earnPlanned">—</strong>
+            <span class="earnings-meta" id="earnPlannedMeta">przyszłe zapisy</span>
+          </div>
+          <div class="earnings-item is-total">
+            <span class="earnings-label">Razem</span>
+            <strong class="earnings-value is-brand" id="earnTotal">—</strong>
+            <span class="earnings-meta" id="earnTotalMeta">wszystkie zapisy</span>
+          </div>
+        </div>
+        <p class="earnings-note" id="earnNote"></p>
+        <details class="earnings-breakdown">
+          <summary>Szczegóły wyliczenia</summary>
+          <div class="earnings-list" id="earnBreakdown"></div>
+        </details>
+      </section>
+
       <!-- ── Grafik ─────────────────────────────────────────── -->
       <section data-panel="grafik">
         <p class="lead">
@@ -450,6 +520,7 @@
       grafik: null,
       uslugi: null,
       bookings: [],
+      earningsBookings: [],
       exceptionDraft: [],
       exceptionServicesDraft: [],
       grafikDirty: false,
@@ -467,7 +538,9 @@
        'exceptionDate', 'exceptionOff', 'chipsException', 'chipsDefaultServices',
        'chipsExceptionServices', 'addException', 'exceptionList',
        'serviceList', 'uslugiHint', 'addService', 'fromDate', 'toDate', 'refreshBookings',
-       'bookingsSummary', 'bookingList'].forEach(function (id) { el[id] = $(id); });
+       'bookingsSummary', 'bookingList', 'earnDone', 'earnDoneMeta', 'earnPlanned',
+       'earnPlannedMeta', 'earnTotal', 'earnTotalMeta', 'earnNote',
+       'earnBreakdown'].forEach(function (id) { el[id] = $(id); });
 
       el.loginForm.addEventListener('submit', onLogin);
       el.logout.addEventListener('click', onLogout);
@@ -577,6 +650,7 @@
       el.app.hidden = false;
       loadGrafik();
       loadUslugi();
+      loadEarnings();
     }
 
     function showError(message) {
@@ -605,6 +679,8 @@
       forgetToken();
       state.grafik = null;
       state.uslugi = null;
+      state.bookings = [];
+      state.earningsBookings = [];
       state.grafikDirty = false;
       state.uslugiDirty = false;
       updateSavebar();
@@ -1033,6 +1109,7 @@
 
         renderServices();
         updateSavebar();
+        renderEarnings();
       }).catch(function (err) {
         toast(err.message, true);
       });
@@ -1159,7 +1236,182 @@
         state.uslugi.exists = true;
         state.uslugiDirty = false;
         updateSavebar();
+        renderEarnings();
         toast('Oferta zapisana — strona pokaże ją od razu.');
+      });
+    }
+
+    /* ── Zarobki ──────────────────────────────────────────── */
+
+    // Wszystkie zapisy z arkusza — bez filtra dat, żeby podsumowanie było pełne.
+    function loadEarnings() {
+      return call('rezerwacje', {}).then(function (res) {
+        state.earningsBookings = res.bookings || [];
+        renderEarnings();
+      }).catch(function (err) {
+        if (!el.earnNote) return;
+        el.earnNote.textContent = 'Nie udało się policzyć zarobków: ' + err.message;
+        el.earnNote.classList.add('is-warn');
+      });
+    }
+
+    // „90 zł”, „1 200 zł”, „od 90 zł” → 90 / 1200; brak liczby → null
+    function parsePrice(text) {
+      var raw = String(text || '').replace(/\u00a0/g, ' ').replace(/\s+/g, '');
+      var match = raw.match(/\d+(?:[.,]\d+)?/);
+      if (!match) return null;
+      var value = parseFloat(match[0].replace(',', '.'));
+      return isNaN(value) ? null : value;
+    }
+
+    function formatMoney(value) {
+      try {
+        return new Intl.NumberFormat('pl-PL', { maximumFractionDigits: 2 }).format(value) + ' zł';
+      } catch (e) {
+        return String(Math.round(value)) + ' zł';
+      }
+    }
+
+    function bookingsLabel(count) {
+      if (count === 1) return '1 zapis';
+      var rest = count % 10;
+      var tens = count % 100;
+      if (rest >= 2 && rest <= 4 && (tens < 12 || tens > 14)) return count + ' zapisy';
+      return count + ' zapisów';
+    }
+
+    // Sumuje wartość zapisów według cen z zakładki Zajęcia.
+    // Odbyte = data przed dzisiejszą, zaplanowane = dzisiaj i późniejsze.
+    function computeEarnings(bookings, services) {
+      var prices = {};
+      (services || []).forEach(function (svc) {
+        prices[String(svc.name || '').trim().toLowerCase()] = parsePrice(svc.price);
+      });
+
+      var today = iso(new Date());
+      var result = {
+        done: { count: 0, money: 0 },
+        planned: { count: 0, money: 0 },
+        unpriced: 0,
+        invalid: 0,
+        byService: [],
+        total: { count: 0, money: 0 }
+      };
+      var index = {};
+
+      (bookings || []).forEach(function (booking) {
+        var key = String(booking.service || '').trim().toLowerCase();
+        var hasDate = /^\d{4}-\d{2}-\d{2}$/.test(String(booking.date || ''));
+
+        // Wiersze bez daty albo bez nazwy zajęć to śmieci w arkuszu — nie zgadujemy za nie kwoty.
+        if (!hasDate || !key) {
+          result.invalid += 1;
+          return;
+        }
+
+        var hasPrice = Object.prototype.hasOwnProperty.call(prices, key);
+        var price = hasPrice ? prices[key] : null;
+        var bucket = String(booking.date) < today ? result.done : result.planned;
+        bucket.count += 1;
+
+        if (!index[key]) {
+          index[key] = {
+            name: booking.service || 'Zajęcia bez nazwy',
+            count: 0,
+            price: price,
+            money: 0,
+            unpriced: 0
+          };
+          result.byService.push(index[key]);
+        }
+
+        var entry = index[key];
+        entry.count += 1;
+
+        if (price === null) {
+          entry.unpriced += 1;
+          result.unpriced += 1;
+        } else {
+          bucket.money += price;
+          entry.money += price;
+        }
+      });
+
+      result.total = {
+        count: result.done.count + result.planned.count,
+        money: result.done.money + result.planned.money
+      };
+
+      result.byService.sort(function (a, b) {
+        if (b.money !== a.money) return b.money - a.money;
+        return b.count - a.count;
+      });
+
+      return result;
+    }
+
+    function renderEarnings() {
+      if (!el.earnDone) return;
+
+      var result = computeEarnings(state.earningsBookings, state.uslugi ? state.uslugi.services : []);
+
+      el.earnDone.textContent = formatMoney(result.done.money);
+      el.earnDoneMeta.textContent = bookingsLabel(result.done.count);
+      el.earnPlanned.textContent = formatMoney(result.planned.money);
+      el.earnPlannedMeta.textContent = bookingsLabel(result.planned.count);
+      el.earnTotal.textContent = formatMoney(result.total.money);
+      el.earnTotalMeta.textContent = bookingsLabel(result.total.count);
+
+      var notes = [];
+
+      if (result.invalid) {
+        notes.push('Pomijam ' + bookingsLabel(result.invalid) + ' bez daty lub nazwy zajęć — usuń je w zakładce Zapisy.');
+      }
+
+      if (!result.total.count && !result.invalid) {
+        notes.push('Brak zapisów w arkuszu — nie ma czego liczyć.');
+      } else if (result.unpriced && result.unpriced === result.total.count) {
+        notes.push('Żadne z zapisanych zajęć nie ma jeszcze ceny w zakładce Zajęcia, więc kwota to 0 zł. Uzupełnij „Cena” — po zapisaniu przeliczę wszystko od razu.');
+      } else if (result.unpriced) {
+        notes.push(bookingsLabel(result.unpriced) + ' bez ceny w cenniku — uzupełnij „Cena” w zakładce Zajęcia.');
+      }
+
+      if (!notes.length) {
+        notes.push('Wartość z aktualnego cennika zajęć. Anulowane zapisy znikają z arkusza, więc nie są liczone.');
+      }
+
+      el.earnNote.textContent = notes.join(' ');
+      el.earnNote.classList.toggle('is-warn', result.invalid > 0 || result.unpriced > 0);
+
+      el.earnBreakdown.innerHTML = '';
+
+      if (!result.byService.length) {
+        var empty = document.createElement('span');
+        empty.className = 'muted';
+        empty.textContent = 'Brak zapisów w arkuszu.';
+        el.earnBreakdown.appendChild(empty);
+        return;
+      }
+
+      result.byService.forEach(function (entry) {
+        var row = document.createElement('div');
+        row.className = 'earnings-line';
+
+        var left = document.createElement('span');
+        left.textContent = entry.name + ' · ' + bookingsLabel(entry.count);
+
+        var right = document.createElement('b');
+        if (entry.price === null) {
+          right.textContent = 'bez ceny';
+        } else if (entry.unpriced) {
+          right.textContent = formatMoney(entry.money) + ' (+' + entry.unpriced + ' bez ceny)';
+        } else {
+          right.textContent = entry.count + ' × ' + formatMoney(entry.price) + ' = ' + formatMoney(entry.money);
+        }
+
+        row.appendChild(left);
+        row.appendChild(right);
+        el.earnBreakdown.appendChild(row);
       });
     }
 
@@ -1265,7 +1517,7 @@
           toast(res.calendarRemoved
             ? 'Zapis odwołany, wydarzenie usunięte z Kalendarza.'
             : 'Zapis odwołany. Sprawdź Kalendarz Google — wydarzenia nie udało się dopasować.');
-          return loadBookings();
+          return loadBookings().then(function () { return loadEarnings(); });
         })
         .catch(function (err) {
           button.disabled = false;

@@ -637,6 +637,14 @@ body {
   cursor: pointer;
   overflow-wrap: anywhere;
 }
+/* Wariant pod slotami: ten sam dzień ma też godziny na inne zajęcia */
+.s-slot-hint--inline {
+  min-height: 0;
+  padding: .35rem .45rem;
+  margin-top: .05rem;
+  background: transparent;
+}
+
 .s-slot-hint-btn:hover { color: var(--brand); }
 .s-slot-hint-btn:focus-visible {
   outline: 2px solid var(--brand);
@@ -1822,6 +1830,7 @@ body {
   /* Widoczny jest tylko jeden dzień — kreska i podpowiedź zajmują pełną szerokość */
   .s-slot-empty       { min-height: 68px; grid-column: 1 / -1; }
   .s-slot-hint        { min-height: 68px; grid-column: 1 / -1; align-items: center; }
+  .s-slot-hint--inline { min-height: 0; align-items: flex-start; }
   .s-slot-hint-btn    { font-size: .9rem; }
 
   .s-slot-btn {
