@@ -100,20 +100,29 @@ Powyższe wiersze to **domyślna oferta zapasowa** — używana tylko wtedy, gdy
 ---
 
 ### 2. Zakładka `Grafik`
-Zarządzanie godzinami pracy i dniami wolnymi.
+Zarządzanie godzinami pracy, dniami wolnymi i tym, jakie zajęcia odbywają się w danych godzinach.
 
-| Kolumna A: Dzien / Data | Kolumna B: Godziny (rozdzielone przecinkiem `,`) |
-| :--- | :--- |
-| **Domyślne** | 18:00, 19:00, 20:00 |
-| **Sobota** | 10:00, 11:30, 13:00 |
-| **Niedziela** | *(pozostaw puste = dzień wolny)* |
-| **2026-10-25** | 12:00, 14:00, 16:00 |
+| Kolumna A: Dzien / Data | Kolumna B: Godziny (rozdzielone przecinkiem `,`) | Kolumna C: Zajęcia (opcjonalnie) |
+| :--- | :--- | :--- |
+| **Domyślne** | 18:00, 19:00, 20:00 | Spacer 1-1, Spacer grupowy |
+| **Sobota** | 10:00, 11:30, 13:00 | Spacer grupowy |
+| **Niedziela** | *(pozostaw puste = dzień wolny)* | |
+| **2026-10-25** | 12:00, 14:00, 16:00 | |
+| **2026-11-05** | 17:00, 18:30 | Posłuszeństwo |
 
 > **Zasady działania grafiku:**
 > - `Domyślne` — godziny obowiązujące standardowo od poniedziałku do piątku.
 > - Dni tygodnia (np. `Sobota`, `Wtorek`) — nadpisują godziny dla danego dnia tygodnia.
 > - Konkretna data w formacie `YYYY-MM-DD` (np. `2026-10-25`) — ma najwyższy priorytet (pozwala ustalić wyjątkowy grafik na dany dzień lub zaplanować urlop).
 > - Pusta komórka w kolumnie B oznacza dzień wolny (*„Brak terminów”*).
+
+> **Kolumna C — jakie zajęcia w tych godzinach:**
+> - Pusta komórka = w tych godzinach można zapisać się na **wszystkie** zajęcia z zakładki `Uslugi` (tak działa grafik bez tej kolumny).
+> - Wpisane nazwy (rozdzielone przecinkiem, dokładnie jak w `Uslugi`) = w tych godzinach przyjmujemy **tylko te zajęcia**. Pozostałe zajęcia nie pokażą na stronie tych godzin.
+> - Dzięki temu salka może być dostępna tylko w wybranych terminach: w wierszu `Domyślne` wpisz same spacery, a sale dopisuj wierszem z konkretną datą — np. `2026-11-05 | 17:00, 18:30 | Posłuszeństwo`.
+> - Jeden wiersz = jeden zestaw godzin z jednymi zajęciami. Chcesz w tym samym dniu spacery rano i salkę wieczorem? Dodaj dwa wiersze z tą samą datą — godziny się połączą, a zajęcia zostaną przy swoich godzinach.
+> - Godziny i zajęcia z wiersza na datę zastępują cały dzień tygodnia, więc w wyjątku wypisz wszystkie godziny, które wtedy obowiązują.
+> - Kontrola działa też po stronie serwera: jeśli ktoś ma otwartą stronę z nieaktualnym grafikiem, zapis na zajęcia poza tą listą zostanie odrzucony z komunikatem.
 
 ---
 
@@ -264,9 +273,12 @@ zakładkę lub dodać do ekranu głównego („Dodaj do ekranu głównego” w p
 | **Własne** | Dzień ma własną listę godzin — tapnij godziny, które przyjmujesz. |
 | **Wolne** | Dzień bez terminów; strona pokaże wtedy przygaszony dzień bez slotów. |
 | **Wyjątek na datę** | Najwyższy priorytet: urlop, święto albo jednorazowe zajęcia w innej godzinie. |
+| **Zajęcia w tych godzinach** | Pod każdą listą godzin wybierasz, co się w nich odbywa. Brak zaznaczenia = wszystkie zajęcia; chip **„wszystkie zajęcia”** czyści wybór. |
 
 Godzinę spoza listy (np. `11:30`) dodasz chipem **„+ inna”**. Panel zapisuje całą zakładkę
-`Grafik` od nowa, ale wiersze, których nie rozumie, przepisuje bez zmian.
+`Grafik` od nowa (kolumny A–C), ale wiersze, których nie rozumie, przepisuje bez zmian.
+Panel nie pozwoli zapisać nazwy zajęć, której nie ma w zakładce `Zajęcia` — pokaże wtedy
+komunikat z tą nazwą, bo po nazwach strona rozpoznaje, kto na co się zapisuje.
 
 **Zajęcia** — zakładka `Uslugi` (kolumny A–I): nazwa, ikona, opis, limit psów w grupie, flaga
 zajęć indywidualnych, miejsca spotkania, cena, czas trwania i „co w cenie”. Nazwy muszą być

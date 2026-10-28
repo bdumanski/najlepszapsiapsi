@@ -220,6 +220,8 @@
     .seg button.is-on { background: var(--brand-soft); color: var(--brand-dark); }
     .seg button + button { border-left: 1px solid var(--border); }
     .day-note { font-size: .76rem; color: var(--text-muted); margin-top: .4rem; }
+    .services-note { font-size: .74rem; color: var(--text-muted); margin-top: .55rem; }
+    .services-note strong { color: var(--text-soft); }
 
     /* ── Wyjątki ──────────────────────────────────────────── */
     .exception {
@@ -344,7 +346,8 @@
         <p class="lead">
           Ustaw godziny, w których przyjmujesz zapisy. Dzień ustawiony na „Domyślne”
           korzysta z godzin domyślnych, „Własne” ma własną listę, a „Wolne” nie pokazuje
-          na stronie żadnego terminu.
+          na stronie żadnego terminu. Przy każdym zestawie godzin możesz wskazać, jakie
+          zajęcia się w nich odbywają — np. salka tylko w wybranych terminach.
         </p>
 
         <div class="card">
@@ -353,6 +356,8 @@
             <p class="hint">Punkt wyjścia dla dni ustawionych na „Domyślne”.</p>
           </div>
           <div class="chips" id="chipsDefault"></div>
+          <p class="services-note">Zajęcia w tych godzinach — <strong>brak zaznaczenia = wszystkie</strong>. Zaznacz np. tylko spacery, żeby salka była dostępna wyłącznie w terminach dopisanych niżej.</p>
+          <div class="chips" id="chipsDefaultServices"></div>
         </div>
 
         <h2 class="section-title">Dni tygodnia</h2>
@@ -375,6 +380,8 @@
             </div>
           </div>
           <div class="chips" id="chipsException"></div>
+          <p class="services-note">Zajęcia w tych godzinach — <strong>brak zaznaczenia = wszystkie</strong>.</p>
+          <div class="chips" id="chipsExceptionServices"></div>
           <button class="btn secondary" id="addException" type="button">Dodaj wyjątek dla tej daty</button>
         </div>
         <div id="exceptionList" class="stack" style="margin-top:.6rem"></div>
@@ -444,6 +451,7 @@
       uslugi: null,
       bookings: [],
       exceptionDraft: [],
+      exceptionServicesDraft: [],
       grafikDirty: false,
       uslugiDirty: false
     };
@@ -456,7 +464,8 @@
     function init() {
       ['boot', 'login', 'loginForm', 'loginError', 'pin', 'app', 'who', 'logout',
        'savebar', 'savebarText', 'saveBtn', 'toast', 'weekdayList', 'chipsDefault',
-       'exceptionDate', 'exceptionOff', 'chipsException', 'addException', 'exceptionList',
+       'exceptionDate', 'exceptionOff', 'chipsException', 'chipsDefaultServices',
+       'chipsExceptionServices', 'addException', 'exceptionList',
        'serviceList', 'uslugiHint', 'addService', 'fromDate', 'toDate', 'refreshBookings',
        'bookingsSummary', 'bookingList'].forEach(function (id) { el[id] = $(id); });
 
@@ -651,14 +660,26 @@
 
     function loadGrafik() {
       return call('grafik').then(function (res) {
+        var fallback = res['default'] || {};
         state.grafik = {
-          'default': (res['default'] || FALLBACK_DEFAULT).slice(),
-          weekdays: res.weekdays || {},
-          dates: res.dates || [],
-          extraRows: res.extraRows || []
+          'default': {
+            hours: (fallback.hours || FALLBACK_DEFAULT).slice(),
+            services: (fallback.services || []).slice()
+          },
+          weekdays: normalizeWeekdays(res.weekdays),
+          dates: (res.dates || []).map(function (entry) {
+            return {
+              date: entry.date,
+              hours: (entry.hours || []).slice(),
+              services: (entry.services || []).slice()
+            };
+          }),
+          extraRows: res.extraRows || [],
+          services: res.services || []
         };
         state.grafikDirty = false;
         state.exceptionDraft = adminDefaultHours();
+        state.exceptionServicesDraft = [];
         renderGrafik();
         updateSavebar();
       }).catch(function (err) {
@@ -666,27 +687,91 @@
       });
     }
 
+    // Wpisy dni tygodnia zawsze w formie { hours, services } — także te z arkusza.
+    function normalizeWeekdays(source) {
+      var out = {};
+      Object.keys(source || {}).forEach(function (key) {
+        var entry = source[key] || {};
+        out[key] = {
+          hours: (entry.hours || []).slice(),
+          services: (entry.services || []).slice()
+        };
+      });
+      return out;
+    }
+
     function renderGrafik() {
       if (!state.grafik) return;
 
-      renderChips(el.chipsDefault, state.grafik['default'], function (hour) {
-        toggleInList(state.grafik['default'], hour);
+      renderChips(el.chipsDefault, state.grafik['default'].hours, function (hour) {
+        toggleInList(state.grafik['default'].hours, hour);
         markDirty('grafik');
         renderGrafik();
       }, function () {
         var custom = askForHour();
         if (!custom) return;
-        if (state.grafik['default'].indexOf(custom) === -1) {
-          state.grafik['default'].push(custom);
-          sortHours(state.grafik['default']);
+        if (state.grafik['default'].hours.indexOf(custom) === -1) {
+          state.grafik['default'].hours.push(custom);
+          sortHours(state.grafik['default'].hours);
           markDirty('grafik');
           renderGrafik();
         }
       });
 
+      renderServiceChips(el.chipsDefaultServices, state.grafik['default'].services, function () {
+        markDirty('grafik');
+        renderGrafik();
+      });
+
       renderExceptionChips();
       renderWeekdays();
       renderExceptions();
+    }
+
+    // Które zajęcia mogą się odbywać w danych godzinach. Pusto = wszystkie.
+    function renderServiceChips(container, selected, onChange) {
+      if (!container) return;
+      container.innerHTML = '';
+
+      selected = selected || [];
+      var all = (state.grafik && state.grafik.services) || [];
+      if (!all.length) {
+        var note = document.createElement('span');
+        note.className = 'muted';
+        note.textContent = 'Najpierw dodaj zajęcia w zakładce „Zajęcia”.';
+        container.appendChild(note);
+        return;
+      }
+
+      all.forEach(function (name) {
+        var isOn = selected.indexOf(name) !== -1;
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'chip' + (isOn ? ' is-on' : '');
+        btn.textContent = name;
+        btn.setAttribute('aria-pressed', isOn ? 'true' : 'false');
+        btn.addEventListener('click', function () {
+          if (isOn) {
+            selected.splice(selected.indexOf(name), 1);
+          } else {
+            selected.push(name);
+          }
+          onChange();
+        });
+        container.appendChild(btn);
+      });
+
+      if (selected.length) {
+        var clear = document.createElement('button');
+        clear.type = 'button';
+        clear.className = 'chip chip-add';
+        clear.textContent = 'wszystkie zajęcia';
+        clear.addEventListener('click', function () {
+          selected.length = 0;
+          onChange();
+        });
+        container.appendChild(clear);
+      }
     }
 
     // Godziny proponowane dla nowego wyjątku — „Dzień wolny” nadpisuje je przy dodawaniu.
@@ -706,14 +791,21 @@
         renderExceptionChips();
       });
 
+      renderServiceChips(el.chipsExceptionServices, state.exceptionServicesDraft, function () {
+        renderExceptionChips();
+      });
+
       syncExceptionOffState();
     }
 
-    // Przy zaznaczonym „Dniu wolnym” wybrane godziny nie mają znaczenia.
+    // Przy zaznaczonym „Dniu wolnym” wybrane godziny i zajęcia nie mają znaczenia.
     function syncExceptionOffState() {
       var off = el.exceptionOff.checked;
-      el.chipsException.style.opacity = off ? '.4' : '';
-      el.chipsException.style.pointerEvents = off ? 'none' : '';
+      [el.chipsException, el.chipsExceptionServices].forEach(function (node) {
+        if (!node) return;
+        node.style.opacity = off ? '.4' : '';
+        node.style.pointerEvents = off ? 'none' : '';
+      });
     }
 
     function renderWeekdays() {
@@ -722,7 +814,8 @@
       DAYS.forEach(function (name) {
         var key = name.toLowerCase();
         var hasEntry = Object.prototype.hasOwnProperty.call(state.grafik.weekdays, key);
-        var hours = hasEntry ? state.grafik.weekdays[key] : [];
+        var entry = hasEntry ? state.grafik.weekdays[key] : null;
+        var hours = entry ? entry.hours : [];
         var mode = !hasEntry ? 'default' : (hours.length ? 'custom' : 'off');
 
         var card = document.createElement('div');
@@ -754,25 +847,39 @@
           var chips = document.createElement('div');
           chips.className = 'chips';
           renderChips(chips, hours, function (hour) {
-            toggleInList(state.grafik.weekdays[key], hour);
+            toggleInList(entry.hours, hour);
             markDirty('grafik');
             renderWeekdays();
           }, function () {
             var custom = askForHour();
             if (!custom) return;
-            if (state.grafik.weekdays[key].indexOf(custom) === -1) {
-              state.grafik.weekdays[key].push(custom);
-              sortHours(state.grafik.weekdays[key]);
+            if (entry.hours.indexOf(custom) === -1) {
+              entry.hours.push(custom);
+              sortHours(entry.hours);
               markDirty('grafik');
               renderWeekdays();
             }
           });
           card.appendChild(chips);
+
+          var servicesNote = document.createElement('p');
+          servicesNote.className = 'services-note';
+          servicesNote.textContent = 'Zajęcia w tych godzinach — brak zaznaczenia = wszystkie.';
+          card.appendChild(servicesNote);
+
+          var servicesChips = document.createElement('div');
+          servicesChips.className = 'chips';
+          renderServiceChips(servicesChips, entry.services, function () {
+            markDirty('grafik');
+            renderWeekdays();
+          });
+          card.appendChild(servicesChips);
         } else {
           var note = document.createElement('p');
           note.className = 'day-note';
           note.textContent = mode === 'default'
-            ? 'Korzysta z godzin domyślnych: ' + (state.grafik['default'].join(', ') || 'brak')
+            ? 'Korzysta z godzin domyślnych: ' + (state.grafik['default'].hours.join(', ') || 'brak')
+              + (state.grafik['default'].services.length ? ' (tylko: ' + state.grafik['default'].services.join(', ') + ')' : '')
             : 'Dzień wolny — strona nie pokaże wtedy żadnego terminu.';
           card.appendChild(note);
         }
@@ -785,12 +892,12 @@
       if (mode === 'default') {
         delete state.grafik.weekdays[key];
       } else if (mode === 'off') {
-        state.grafik.weekdays[key] = [];
+        state.grafik.weekdays[key] = { hours: [], services: [] };
       } else {
         var current = state.grafik.weekdays[key];
-        state.grafik.weekdays[key] = (current && current.length)
-          ? current.slice()
-          : state.grafik['default'].slice();
+        state.grafik.weekdays[key] = (current && current.hours && current.hours.length)
+          ? { hours: current.hours.slice(), services: (current.services || []).slice() }
+          : { hours: state.grafik['default'].hours.slice(), services: [] };
       }
       markDirty('grafik');
       renderWeekdays();
@@ -807,7 +914,7 @@
         return;
       }
 
-      state.grafik.dates.forEach(function (entry) {
+      state.grafik.dates.forEach(function (entry, index) {
         var card = document.createElement('div');
         card.className = 'card exception';
 
@@ -820,6 +927,14 @@
         hoursLine.textContent = entry.hours.length ? entry.hours.join(', ') : 'dzień wolny';
         info.appendChild(dateLine);
         info.appendChild(hoursLine);
+
+        if (entry.hours.length && entry.services && entry.services.length) {
+          var servicesLine = document.createElement('div');
+          servicesLine.className = 'exception-hours';
+          servicesLine.textContent = 'tylko: ' + entry.services.join(', ');
+          info.appendChild(servicesLine);
+        }
+
         card.appendChild(info);
 
         var remove = document.createElement('button');
@@ -827,7 +942,7 @@
         remove.className = 'btn danger small';
         remove.textContent = 'Usuń';
         remove.addEventListener('click', function () {
-          state.grafik.dates = state.grafik.dates.filter(function (d) { return d.date !== entry.date; });
+          state.grafik.dates.splice(index, 1);
           markDirty('grafik');
           renderExceptions();
         });
@@ -844,32 +959,51 @@
         return;
       }
 
-      var hours = el.exceptionOff.checked ? [] : state.exceptionDraft.slice();
-      if (!hours.length && !el.exceptionOff.checked) {
+      var isOff = el.exceptionOff.checked;
+      var hours = isOff ? [] : state.exceptionDraft.slice();
+      if (!hours.length && !isOff) {
         toast('Zaznacz godziny albo wybierz „Dzień wolny”.', true);
         return;
       }
       sortHours(hours);
 
-      var existing = state.grafik.dates.filter(function (d) { return d.date === date; })[0];
-      if (existing) {
-        existing.hours = hours;
+      var services = isOff ? [] : state.exceptionServicesDraft.slice();
+
+      // Ta sama data z innymi zajęciami to osobny wpis — nadpisujemy tylko identyczny.
+      var existingIndex = -1;
+      state.grafik.dates.forEach(function (d, index) {
+        if (d.date === date && sameServiceSet(d.services || [], services)) existingIndex = index;
+      });
+
+      if (existingIndex !== -1) {
+        state.grafik.dates[existingIndex].hours = hours;
       } else {
-        state.grafik.dates.push({ date: date, hours: hours });
-        state.grafik.dates.sort(function (a, b) { return a.date < b.date ? -1 : 1; });
+        state.grafik.dates.push({ date: date, hours: hours, services: services });
+        state.grafik.dates.sort(function (a, b) {
+          if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+          return minutes(a.hours[0] || '') - minutes(b.hours[0] || '');
+        });
       }
 
       el.exceptionDate.value = '';
       el.exceptionOff.checked = false;
       state.exceptionDraft = adminDefaultHours();
+      state.exceptionServicesDraft = [];
       renderExceptionChips();
       markDirty('grafik');
       renderExceptions();
     }
 
+    function sameServiceSet(a, b) {
+      if (a.length !== b.length) return false;
+      return a.every(function (name) {
+        return b.indexOf(name) !== -1;
+      });
+    }
+
     function adminDefaultHours() {
-      return (state.grafik && state.grafik['default'].length)
-        ? state.grafik['default'].slice()
+      return (state.grafik && state.grafik['default'].hours.length)
+        ? state.grafik['default'].hours.slice()
         : FALLBACK_DEFAULT.slice();
     }
 

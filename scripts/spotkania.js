@@ -74,7 +74,8 @@ let availableServices = [
 
 let scheduleConfig = {
   defaultHours: ['18:00', '19:00', '20:00'],
-  days: {}
+  days: {},
+  serviceHours: {}
 };
 
 // ── Stan aplikacji ──────────────────────────────────────────
@@ -208,23 +209,45 @@ function getInitialMobileDayIndex() {
   return (diff >= 0 && diff < 7) ? diff : 0;
 }
 
-// Zwraca godziny dostępne dla konkretnego dnia tygodnia lub konkretnej daty
-function getHoursForDay(dayDate, dayIndex) {
-  const dateISO = formatDateISO(dayDate);
+// Wpis grafiku obowiązujący danego dnia: data → dzień tygodnia → godziny domyślne.
+// `key` to klucz, pod którym ten wpis występuje w zakładce Grafik.
+function getScheduleEntry(dateISO) {
+  const dayIndex = (new Date(dateISO + 'T00:00:00').getDay() + 6) % 7;
   const dayNameLower = dayNames[dayIndex].toLowerCase();
 
   // Sprawdzamy czy w grafiku jest wpis na konkretną datę (np. urlop lub wyjątek)
   if (scheduleConfig.days && scheduleConfig.days[dateISO] !== undefined) {
-    return scheduleConfig.days[dateISO];
+    return { key: dateISO, hours: scheduleConfig.days[dateISO] };
   }
 
   // Sprawdzamy czy jest wpis dla danego dnia tygodnia (np. sobota, niedziela)
   if (scheduleConfig.days && scheduleConfig.days[dayNameLower] !== undefined) {
-    return scheduleConfig.days[dayNameLower];
+    return { key: dayNameLower, hours: scheduleConfig.days[dayNameLower] };
   }
 
   // W przeciwnym razie domyślne godziny
-  return scheduleConfig.defaultHours || ['18:00', '19:00', '20:00'];
+  return { key: 'default', hours: scheduleConfig.defaultHours || ['18:00', '19:00', '20:00'] };
+}
+
+// Czy o tej godzinie można zapisać się na te zajęcia? Trzecia kolumna zakładki
+// Grafik pozwala zawęzić godzinę do wybranych zajęć (np. tylko salka).
+function isServiceAvailableAt(dateISO, hour, serviceName) {
+  const entry = getScheduleEntry(dateISO);
+  if (entry.hours.indexOf(hour) === -1) return false;
+
+  const restrictions = (scheduleConfig.serviceHours && scheduleConfig.serviceHours[entry.key]) || null;
+  const allowed = restrictions ? restrictions[hour] : null;
+  if (!allowed || !allowed.length) return true;
+
+  const target = String(serviceName || '').trim().toLowerCase();
+  return allowed.some(name => String(name).trim().toLowerCase() === target);
+}
+
+// Zwraca godziny dostępne dla wybranych zajęć w danym dniu.
+function getHoursForDay(dayDate) {
+  const dateISO = formatDateISO(dayDate);
+  return getScheduleEntry(dateISO).hours
+    .filter(hour => isServiceAvailableAt(dateISO, hour, selectedService));
 }
 
 // Próba odczytu zapamiętanych usług i grafiku z pamięci podręcznej (błyskawiczne ładowanie bez migotania)
@@ -337,6 +360,13 @@ function renderServices() {
       });
       if (serviceTypeHidden) serviceTypeHidden.value = selectedService;
       
+      // Jeśli wybrany wcześniej slot nie należy do tych zajęć, odznacz go
+      if (selectedDateStr && selectedHour && !isServiceAvailableAt(selectedDateStr, selectedHour, srv.name)) {
+        selectedDateStr = '';
+        selectedHour = '';
+        hideStep3();
+      }
+
       // Jeśli wybrany wcześniej slot ma już zapisaną inną usługę, odznacz slot
       if (selectedDateStr && selectedHour) {
         const matches = bookedData.filter(b => b.date === selectedDateStr && b.timeSlot === selectedHour);
