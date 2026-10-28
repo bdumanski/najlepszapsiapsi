@@ -22,6 +22,7 @@ Projekt łączy lekki frontend HTML/CSS/JS z bezserwerowym backendem opartym na 
   - **„Najbliższy wolny termin”** — jednym kliknięciem przeskakuje do najwcześniejszego wolnego okna (szuka do 60 dni w przód).
   - **Nawigacja klawiaturą** — Tab wchodzi do siatki raz, dalej poruszamy się strzałkami (pion zostaje w wybranym dniu).
   - Jedno źródło prawdy dla dostępności (`getSlotState`), więc kropka pod dniem zawsze zgadza się z siatką i uwzględnia wybrane zajęcia.
+  - **Dzień z innymi zajęciami** — gdy wybrane zajęcia nie mają w danym dniu terminów, a inne mają, w kolumnie pojawia się np. „tylko 20:00 · Posłuszeństwo” z klikalną nazwą (a nie myląca kreska), więc klient widzi, że coś się tego dnia dzieje i może przeskoczyć na te zajęcia jednym kliknięciem. Podpowiedź pokazuje się tylko w dniach, które różnią się od reszty tygodnia, żeby nie zagracać siatki.
   3. Formularz danych opiekuna i psa oraz automatycznie dopasowane lokalizacje.
 - **Bezobsługowe zarządzanie z telefonu / Arkusza Google**:
   - Zarządzanie **nazwami zajęć, ikonami, opisami i limitami psów** bez edycji plików HTML.

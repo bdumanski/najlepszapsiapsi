@@ -531,6 +531,7 @@ body {
 .s-day-dot.is-free    { background: var(--brand); }
 .s-day-dot.is-partial { background: var(--accent); }
 .s-day-dot.is-busy    { background: #CFCBC3; }
+.s-day-dot.is-other   { background: transparent; box-shadow: inset 0 0 0 1.5px var(--accent); }
 
 /* ── Baner dnia (mobile) ──────────────────────────────────── */
 
@@ -584,6 +585,12 @@ body {
   border-bottom-style: dashed;
 }
 
+/* Dzień, w którym są tylko inne zajęcia niż wybrane — ma zostać zauważony */
+.s-day-col.is-other .s-day-col-header {
+  opacity: .8;
+  border-bottom-style: dashed;
+}
+
 /* Dzień wolny: subtelna kreska zamiast zupełnie pustej kolumny */
 .s-slot-empty {
   display: flex;
@@ -592,6 +599,49 @@ body {
   min-height: 3.4rem;
   font-size: 1.1rem;
   color: #D8D4CC;
+}
+
+/* Dzień z samymi innymi zajęciami: „tylko Posłuszeństwo” zamiast kreski.
+   Nazwa jest przyciskiem — klient jednym kliknięciem przeskakuje na te zajęcia. */
+.s-slot-hint {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: .22rem;
+  min-height: 3.4rem;
+  padding: .45rem .4rem;
+  border: 1px dashed var(--border);
+  border-radius: .55rem;
+  background: rgba(255, 255, 255, .45);
+}
+.s-slot-hint-label {
+  font-size: .6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--text-muted);
+}
+.s-slot-hint-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: .74rem;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: left;
+  color: var(--brand-dark);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.s-slot-hint-btn:hover { color: var(--brand); }
+.s-slot-hint-btn:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 
 /* Desktop: pełny tydzień */
@@ -1769,8 +1819,10 @@ body {
     gap: .65rem;
   }
 
-  /* Widoczny jest tylko jeden dzień — kreska zajmuje pełną szerokość */
+  /* Widoczny jest tylko jeden dzień — kreska i podpowiedź zajmują pełną szerokość */
   .s-slot-empty       { min-height: 68px; grid-column: 1 / -1; }
+  .s-slot-hint        { min-height: 68px; grid-column: 1 / -1; align-items: center; }
+  .s-slot-hint-btn    { font-size: .9rem; }
 
   .s-slot-btn {
     padding: .85rem .6rem;

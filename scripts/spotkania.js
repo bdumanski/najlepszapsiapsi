@@ -250,6 +250,39 @@ function getHoursForDay(dayDate) {
     .filter(hour => isServiceAvailableAt(dateISO, hour, selectedService));
 }
 
+// Nazwy zajęć, które mają tego dnia jakiekolwiek terminy — także inne niż wybrane.
+// Dzięki temu dzień z samą salką nie wygląda dla klienta jak dzień wolny.
+function getServicesWithSlotsOn(dateISO) {
+  const entry = getScheduleEntry(dateISO);
+  if (!entry.hours.length) return [];
+
+  return availableServices
+    .filter(srv => entry.hours.some(hour => isServiceAvailableAt(dateISO, hour, srv.name)))
+    .map(srv => srv.name);
+}
+
+// Najczęstszy zestaw zajęć w widocznym tygodniu. Dni, które się od niego różnią,
+// to wyjątki (np. jednorazowa salka) — tylko tam warto tłumaczyć „tylko…” ,
+// inaczej cała siatka zamienia się w ścianę podpowiedzi.
+function getBackgroundServiceSignature(mondayDate) {
+  const counts = {};
+  let best = '';
+  let bestCount = 0;
+
+  for (let i = 0; i < 7; i++) {
+    const dayDate = new Date(mondayDate);
+    dayDate.setDate(dayDate.getDate() + i);
+    const signature = getServicesWithSlotsOn(formatDateISO(dayDate)).join('|');
+    counts[signature] = (counts[signature] || 0) + 1;
+    if (counts[signature] > bestCount) {
+      bestCount = counts[signature];
+      best = signature;
+    }
+  }
+
+  return best;
+}
+
 // Próba odczytu zapamiętanych usług i grafiku z pamięci podręcznej (błyskawiczne ładowanie bez migotania)
 try {
   const cachedServices = localStorage.getItem('psiapsi_services_cache');
@@ -725,16 +758,23 @@ function renderCalendar() {
 
   const activeServiceObj = getServiceByName(selectedService);
 
+  const background = getBackgroundServiceSignature(currentMonday);
+
   const days = [];
   for (let i = 0; i < 7; i++) {
     const dayDate = new Date(currentMonday);
     dayDate.setDate(dayDate.getDate() + i);
+    const dateStr = formatDateISO(dayDate);
+    const allServices = getServicesWithSlotsOn(dateStr);
     days.push({
       index:   i,
       date:    dayDate,
-      dateStr: formatDateISO(dayDate),
+      dateStr: dateStr,
       today:   isToday(dayDate),
-      hours:   getHoursForDay(dayDate, i).slice().sort(compareHours)
+      hours:   getHoursForDay(dayDate, i).slice().sort(compareHours),
+      allServices: allServices,
+      isUnusual:   allServices.join('|') !== background,
+      otherServices: allServices.filter(name => name !== selectedService)
     });
   }
 
@@ -744,11 +784,15 @@ function renderCalendar() {
   studioGrid.innerHTML = '';
 
   days.forEach(day => {
+    const onlyOtherServices = day.hours.length === 0
+      && day.otherServices.length > 0
+      && day.isUnusual;
+
     const col = document.createElement('div');
     col.className = 's-day-col'
       + (day.today ? ' is-today' : '')
       + (day.index === selectedMobileDayIndex ? ' is-mobile-active' : '')
-      + (day.hours.length === 0 ? ' is-off' : '');
+      + (day.hours.length === 0 ? (onlyOtherServices ? ' is-other' : ' is-off') : '');
     col.dataset.dayIndex = day.index;
 
     const hdr = document.createElement('div');
@@ -759,7 +803,9 @@ function renderCalendar() {
     `;
     col.appendChild(hdr);
 
-    if (day.hours.length === 0) {
+    if (onlyOtherServices) {
+      col.appendChild(buildOtherServicesHint(day));
+    } else if (day.hours.length === 0) {
       // Dzień bez terminów — jedna kreska zamiast pustej kolumny
       const off = document.createElement('span');
       off.className = 's-slot-empty';
@@ -778,6 +824,40 @@ function renderCalendar() {
   applyRovingTabindex();
   renderDaysStrip();
   updateMobileView();
+}
+
+// Dzień, w którym wybrane zajęcia nie mają terminów, ale inne mają.
+// Zamiast kreski pokazujemy, co się tego dnia dzieje — kliknięcie przełącza zajęcia.
+function buildOtherServicesHint(day) {
+  const wrap = document.createElement('div');
+  wrap.className = 's-slot-hint';
+
+  // Godziny, w których odbywają się te inne zajęcia — w tym dniu mogą być inne niż reszta tygodnia.
+  const entry = getScheduleEntry(day.dateStr);
+  const otherHours = entry.hours.filter(hour =>
+    day.otherServices.some(name => isServiceAvailableAt(day.dateStr, hour, name))
+  );
+
+  const label = document.createElement('span');
+  label.className = 's-slot-hint-label';
+  label.textContent = otherHours.length ? 'tylko ' + otherHours.join(', ') : 'tylko';
+  wrap.appendChild(label);
+
+  day.otherServices.forEach(name => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 's-slot-hint-btn';
+    btn.textContent = name;
+    btn.setAttribute('aria-label', `Pokaż terminy: ${name}, ${getPolishDayName(day.date)} ${formatDatePL(day.date)}`);
+    btn.addEventListener('click', () => {
+      const tile = Array.from(document.querySelectorAll('.s-service-btn'))
+        .find(b => b.dataset.service === name);
+      if (tile) tile.click();
+    });
+    wrap.appendChild(btn);
+  });
+
+  return wrap;
 }
 
 // Cała siatka to jeden przystanek klawisza Tab — dalej poruszamy się strzałkami.
@@ -1000,6 +1080,7 @@ function renderDaysStrip() {
   mobileDaysStrip.innerHTML = '';
 
   const activeServiceObj = getServiceByName(selectedService);
+  const background = getBackgroundServiceSignature(currentMonday);
 
   for (let i = 0; i < 7; i++) {
     const dayDate   = new Date(currentMonday);
@@ -1017,9 +1098,18 @@ function renderDaysStrip() {
       else if (state === 'partial') hasPartial = true;
     });
 
-    const dotClass = hasFree ? 'is-free' : (hasPartial ? 'is-partial' : 'is-busy');
+    // Dzień z terminami tylko na inne zajęcia nie jest „zajęty” — warto to pokazać,
+    // ale wyłącznie wtedy, gdy ten dzień różni się od reszty tygodnia.
+    const dayServices = (hasFree || hasPartial) ? [] : getServicesWithSlotsOn(dateStr);
+    const otherServices = dayServices.join('|') !== background
+      ? dayServices.filter(name => name !== selectedService)
+      : [];
+
+    const dotClass = hasFree ? 'is-free'
+      : (hasPartial ? 'is-partial' : (otherServices.length ? 'is-other' : 'is-busy'));
     const summary  = hasFree ? 'są wolne terminy'
-      : (hasPartial ? 'można jeszcze dołączyć' : 'brak wolnych terminów');
+      : (hasPartial ? 'można jeszcze dołączyć'
+        : (otherServices.length ? 'tylko ' + otherServices.join(', ') : 'brak wolnych terminów'));
 
     const pill = document.createElement('button');
     pill.type = 'button';
