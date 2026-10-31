@@ -224,9 +224,9 @@ function doPost(e) {
       var endTime = new Date(startTime.getTime() + 60 * 60 * 1000); // 1h
 
       var eventLocation = (data.location === 'Inna' ? data.otherLocation : data.location) || 'Warszawa Wawer';
-      var eventTitle = 'PsiApsi: ' + data.serviceType + ' – ' + data.firstName + ' ' + data.lastName + ' (' + data.dogName + ')';
+      var eventTitle = 'Akademia psich manier: ' + data.serviceType + ' – ' + data.firstName + ' ' + data.lastName + ' (' + data.dogName + ')';
       
-      var eventDescription = '🐶 Rezerwacja zajęć PsiApsi\n\n' +
+      var eventDescription = '🐶 Rezerwacja zajęć Akademii psich manier\n\n' +
                              '👤 Klient: ' + data.firstName + ' ' + data.lastName + '\n' +
                              '📧 E-mail: ' + (data.clientEmail || 'Brak') + '\n' +
                              '📞 Telefon: ' + (data.clientPhone || 'Brak') + '\n' +
@@ -265,7 +265,7 @@ function doPost(e) {
       if (data.clientEmail) {
         MailApp.sendEmail({
           to: data.clientEmail,
-          subject: 'Potwierdzenie rezerwacji - PsiApsi',
+          subject: 'Potwierdzenie rezerwacji - Akademia psich manier',
           body: 'Cześć ' + data.firstName + '!\n\n' +
                 'Twoja rezerwacja została przyjęta.\n\n' +
                 '📅 Termin: ' + data.dateDisplay + ' o godz. ' + data.timeSlot + '\n' +
@@ -275,7 +275,7 @@ function doPost(e) {
                 '📞 Kontakt do Ciebie: ' + (data.clientPhone || 'brak') + '\n\n' +
                 'W załączniku zaproszenie do Kalendarza Google. Termin możesz bezpłatnie zmienić ' +
                 'do 24 godzin przed spotkaniem — wystarczy odpowiedź na tego e-maila.\n\n' +
-                'Do zobaczenia na leśnym szlaku!\nZespół PsiApsi'
+                'Do zobaczenia na leśnym szlaku!\nZespół Akademii psich manier'
         });
       }
     } catch (emailErr) {
@@ -299,7 +299,7 @@ function doGet(e) {
   // Zaplecze szkoły: ten sam adres co API, tylko z parametrem ?page=admin
   if (String(params.page || '').toLowerCase() === 'admin') {
     return HtmlService.createHtmlOutputFromFile('Admin')
-      .setTitle('PsiApsi — panel')
+      .setTitle('Akademia psich manier — panel')
       .addMetaTag('viewport', 'width=device-width, initial-scale=1');
   }
 
@@ -1246,7 +1246,9 @@ function adminRemoveCalendarEvent_(date, time, dogName) {
 
   for (var i = 0; i < events.length; i++) {
     var title = String(events[i].getTitle() || '');
-    if (title.indexOf('PsiApsi:') !== 0) continue;
+    // Nowa nazwa szkoły oraz stare wydarzenia sprzed zmiany nazwy.
+    var isSchoolEvent = title.indexOf('Akademia psich manier:') === 0 || title.indexOf('PsiApsi:') === 0;
+    if (!isSchoolEvent) continue;
     if (title.indexOf('(' + dogName + ')') === -1) continue;
 
     var start = events[i].getStartTime();

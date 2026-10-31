@@ -1,5 +1,5 @@
 /* ==========================================================
-   PsiApsi — spotkania.css
+   Akademia psich manier — spotkania.css
    Ciepła, leśna minimalistyka:
    papierowe tło · głęboka zieleń · piaskowy akcent
    Nagłówki: Outfit · Treść: Inter · Odręczne akcenty: Caveat
@@ -101,7 +101,7 @@ body {
 }
 
 .s-header-inner {
-  max-width: 720px;
+  max-width: 820px;
   margin: 0 auto;
   padding: 0 1.25rem;
   height: 64px;
@@ -135,9 +135,10 @@ body {
 .s-logo-name {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 1.3rem;
+  font-size: 1.05rem;
   letter-spacing: -.02em;
   color: var(--text);
+  white-space: nowrap;
 }
 
 .s-logo-sub {
@@ -1072,15 +1073,16 @@ body {
 
 /* ── Nawigacja w nagłówku ─────────────────────────────────── */
 
-.s-nav-links { display: flex; align-items: center; gap: 1.3rem; }
+.s-nav-links { display: flex; align-items: center; gap: .9rem; }
 
 .s-nav-link {
   position: relative;
-  font-size: .88rem;
+  font-size: .84rem;
   font-weight: 500;
   color: var(--text-muted);
   text-decoration: none;
   padding-bottom: 2px;
+  white-space: nowrap;
   transition: color .18s;
 }
 .s-nav-link::after {
@@ -1707,29 +1709,9 @@ body {
 
 /* ── Responsywność ────────────────────────────────────────── */
 
-@media (max-width: 559px) {
-  .s-main             { padding: 1.5rem 1rem 4rem; }
-  .s-page             { gap: 2.25rem; }
-
-  .s-page-title       { padding: 1.75rem 1.4rem; border-radius: var(--radius); }
-  .s-page-title h1    { font-size: 1.5rem; }
-  .s-page-title p     { font-size: .92rem; }
-
-  .s-step             { padding: 1.35rem 1.25rem; }
-  .s-step-label       { letter-spacing: .08em; }
-
-  .s-service-row      { gap: .6rem; }
-  .s-service-btn      { min-width: 100%; flex-direction: row; align-items: center; gap: .9rem; padding: 1rem 2.6rem 1rem 1rem; }
-  .s-service-btn.active::after { top: 50%; transform: translateY(-50%); right: .9rem; }
-  .s-service-text     { flex: 1; }
-  .s-service-icon     { width: 40px; height: 40px; font-size: 1.2rem; }
-
-  .s-form-grid        { grid-template-columns: 1fr; }
-  .s-field--full      { grid-column: 1; }
-
-  .s-mobile-banner    { display: flex; }
-
-  /* Menu mobilne: przycisk hamburgera + rozwijany panel w nagłówku */
+/* Dłuższa nazwa szkoły nie mieści się w poziomym menu — na tabletach
+   przechodzimy na hamburger, zanim linki zaczną się zawijać. */
+@media (max-width: 779px) {
   .s-menu-toggle { display: flex; }
 
   .s-nav-links {
@@ -1762,6 +1744,29 @@ body {
     text-align: center;
     padding: .75rem 1rem;
   }
+}
+
+@media (max-width: 559px) {
+  .s-main             { padding: 1.5rem 1rem 4rem; }
+  .s-page             { gap: 2.25rem; }
+
+  .s-page-title       { padding: 1.75rem 1.4rem; border-radius: var(--radius); }
+  .s-page-title h1    { font-size: 1.5rem; }
+  .s-page-title p     { font-size: .92rem; }
+
+  .s-step             { padding: 1.35rem 1.25rem; }
+  .s-step-label       { letter-spacing: .08em; }
+
+  .s-service-row      { gap: .6rem; }
+  .s-service-btn      { min-width: 100%; flex-direction: row; align-items: center; gap: .9rem; padding: 1rem 2.6rem 1rem 1rem; }
+  .s-service-btn.active::after { top: 50%; transform: translateY(-50%); right: .9rem; }
+  .s-service-text     { flex: 1; }
+  .s-service-icon     { width: 40px; height: 40px; font-size: 1.2rem; }
+
+  .s-form-grid        { grid-template-columns: 1fr; }
+  .s-field--full      { grid-column: 1; }
+
+  .s-mobile-banner    { display: flex; }
 
   .s-price-grid       { grid-template-columns: 1fr; }
   .s-testimonial-grid { grid-template-columns: 1fr; }

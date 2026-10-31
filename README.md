@@ -1,4 +1,4 @@
-# 🐾 PsiApsi — System Rezerwacji Spacerów i Treningów
+# 🐾 Akademia psich manier — System Rezerwacji Spacerów i Treningów
 
 Nowoczesny, responsywny i minimalistyczny system rezerwacji dla psiej szkoły w Warszawie Wawrze: spacery socjalizacyjne, zajęcia w salce treningowej i konsultacje behawioralne. Inspirowany przejrzystym procesem rezerwacyjnym w stylu Wod Guru.
 
@@ -192,7 +192,7 @@ Zdarzenia: `usluga_wybrana`, `termin_wybrany`, `formularz_wyslany`, `rezerwacja_
 3. Wklej zawartość pliku [`app_script`](./app_script) do edytora `Kod.gs`.
 4. Kliknij **Wdróż (Deploy) ➔ Nowe wdrożenie (New deployment)**:
    - Wybierz typ: **Aplikacja internetowa (Web app)**.
-   - **Opis**: np. *PsiApsi API v2*.
+   - **Opis**: np. *Akademia psich manier API v2*.
    - **Wykonaj jako (Execute as)**: *Ja (Twój adres e-mail)*.
    - **Kto ma dostęp (Who has access)**: *Każdy (Anyone)*.
 5. Skopiuj wygenerowany **Adres URL aplikacji internetowej**.

@@ -1,5 +1,5 @@
 /* ==========================================================================
-   PsiApsi — spotkania.js
+   Akademia psich manier — spotkania.js
    Dynamiczne usługi, grafik i lokalizacje sterowane z Google Sheets
    ========================================================================== */
 
@@ -560,14 +560,14 @@ function buildIcs(booking) {
   return [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Psiapsi//Rezerwacja//PL',
+    'PRODID:-//Akademia psich manier//Rezerwacja//PL',
     'CALSCALE:GREGORIAN',
     'BEGIN:VEVENT',
-    `UID:psiapsi-${stamp(start)}@psiapsi.pl`,
+    `UID:akademia-psich-manier-${stamp(start)}@psiapsi.pl`,
     `DTSTAMP:${stamp(new Date())}`,
     `DTSTART:${stamp(start)}`,
     `DTEND:${stamp(end)}`,
-    `SUMMARY:${escIcs('Psiapsi: ' + booking.service)}`,
+    `SUMMARY:${escIcs('Akademia psich manier: ' + booking.service)}`,
     `LOCATION:${escIcs(booking.location)}`,
     `DESCRIPTION:${escIcs(booking.description)}`,
     'END:VEVENT',
@@ -580,7 +580,7 @@ function downloadIcs() {
   const href = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(buildIcs(lastBooking));
   const link = document.createElement('a');
   link.href = href;
-  link.download = `psiapsi-${lastBooking.date}-${lastBooking.hour.replace(':', '')}.ics`;
+  link.download = `akademia-psich-manier-${lastBooking.date}-${lastBooking.hour.replace(':', '')}.ics`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
