@@ -29,7 +29,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles/spotkania.css?v=20261031d">
+  <link rel="stylesheet" href="styles/spotkania.css?v=20261031e">
 
   <script type="application/ld+json">
   {
@@ -175,6 +175,16 @@
           <button type="button" class="s-change-btn" id="changeSelectionBtn">Zmień termin</button>
         </div>
 
+        <!-- Zapisane profile psów — dane trzymane wyłącznie w tej przeglądarce -->
+        <div class="s-profile-panel" id="profilePanel" hidden>
+          <div class="s-profile-head">
+            <span class="s-profile-title">🐾 Zapisane profile psów</span>
+            <span class="s-profile-badge">tylko to urządzenie</span>
+          </div>
+          <div class="s-profile-chips" id="profileChips" role="list"></div>
+          <p class="s-profile-status" id="profileStatus" role="status" aria-live="polite" hidden></p>
+        </div>
+
         <form id="spotkaniaForm" novalidate>
           <input type="hidden" id="bookingDateInput" name="rawDate">
           <input type="hidden" id="timeSlot" name="timeSlot">
@@ -264,6 +274,15 @@
           <h2>Rezerwacja przyjęta!</h2>
           <p>Wydarzenie zostało utworzone w systemie, a oficjalne zaproszenie wysłane do Twojego Kalendarza Google.</p>
           <div class="s-success-details" id="modalSummaryDetails"></div>
+
+          <div class="s-save-profile" id="saveProfileBox" hidden>
+            <div class="s-save-profile-text">
+              <strong>Następnym razem zapiszesz się w minutę</strong>
+              <span>Zapamiętam dane opiekuna i psa tylko w tej przeglądarce. Zgody zawsze potwierdzasz od nowa.</span>
+            </div>
+            <button type="button" class="s-save-profile-btn" id="saveProfileBtn">🐾 Zapisz dane psa</button>
+          </div>
+
           <div class="s-success-actions">
             <button type="button" class="s-success-btn" id="closeModalBtn">Wróć do grafiku</button>
             <button type="button" class="s-success-btn s-success-btn--ghost" id="addToCalendarBtn">📅 Dodaj do kalendarza</button>
@@ -477,6 +496,7 @@
             <p><strong>Administrator danych:</strong> Akademia psich manier, kontakt@psiapsi.pl. <em>Uzupełnij pełną nazwę, adres i NIP.</em></p>
             <p>Dane z formularza (imię, nazwisko, e-mail, telefon, informacje o psie) przetwarzamy wyłącznie w celu przyjęcia i obsługi rezerwacji, kontaktu w sprawie spotkania oraz utworzenia zaproszenia w kalendarzu — na podstawie art. 6 ust. 1 lit. b RODO (wykonanie umowy) oraz lit. f (prawnie uzasadniony interes: kontakt i obrona przed roszczeniami).</p>
             <p>W obsłudze zapisów korzystamy z usług Google (Arkusz Google, Kalendarz Google, Gmail), w związku z czym dane są przetwarzane również poza terenem Polski, na warunkach opisanych w dokumentach Google. Nie przekazujemy danych w celach marketingowych i nie sprzedajemy ich osobom trzecim.</p>
+            <p>Jeśli zdecydujesz się zapamiętać profil psa, dane opiekuna i psa zostaną zapisane wyłącznie w pamięci lokalnej Twojej przeglądarki (localStorage), aby następnym razem wypełnić formularz jednym kliknięciem. Ten zapis nie tworzy dodatkowej kopii w arkuszu i możesz go w każdej chwili usunąć przyciskiem „×” przy profilu albo czyszcząc dane przeglądarki.</p>
             <p>Dane przechowujemy przez czas niezbędny do obsługi rezerwacji i rozliczeń, a w zakresie wymaganym przepisami — do upływu okresu przedawnienia roszczeń.</p>
             <p>Masz prawo dostępu do swoich danych, ich sprostowania, usunięcia, ograniczenia przetwarzania, przenoszenia oraz wniesienia sprzeciwu. Bez kontaktu z Tobą nie jesteśmy w stanie zrealizować usługi, więc wniesienie sprzeciwu wobec przetwarzania oznacza rezygnację z rezerwacji. Możesz również złożyć skargę do Prezesa Urzędu Ochrony Danych Osobowych.</p>
             <p>Podanie danych jest dobrowolne, ale niezbędne do przyjęcia rezerwacji.</p>
@@ -503,6 +523,6 @@
     </div>
   </footer>
 
-  <script src="scripts/spotkania.js?v=20261031d" defer></script>
+  <script src="scripts/spotkania.js?v=20261031e" defer></script>
 </body>
 </html>

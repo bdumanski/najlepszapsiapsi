@@ -24,6 +24,10 @@ Projekt łączy lekki frontend HTML/CSS/JS z bezserwerowym backendem opartym na 
   - Jedno źródło prawdy dla dostępności (`getSlotState`), więc kropka pod dniem zawsze zgadza się z siatką i uwzględnia wybrane zajęcia.
   - **Dzień z innymi zajęciami** — gdy wybrane zajęcia nie mają w danym dniu terminów, a inne mają, w kolumnie pojawiają się zwykłe kafelki tych godzin (ten sam wygląd i kolory co reszta kalendarza), z nazwą zajęć w drugiej linii i zamiast mylącej kreski. Jeśli dzień ma i jedne, i drugie zajęcia (np. 09:00 Rally-o i 18:00–20:00 spacery), godziny są pokazane razem w kolejności. Jedno kliknięcie przełącza zajęcia i od razu zaznacza ten termin. Inne zajęcia pokazujemy tylko w dniach, które różnią się od reszty tygodnia, żeby nie zagracać siatki.
   3. Formularz danych opiekuna i psa oraz automatycznie dopasowane lokalizacje.
+- **Zapamiętane profile psów**:
+  - Po udanej rezerwacji można jednym kliknięciem zapisać dane opiekuna i psa — wyłącznie w pamięci lokalnej przeglądarki (`localStorage`), bez dodatkowej kopii w arkuszu.
+  - Przy kolejnym zapisie profile pojawiają się nad formularzem i wypełniają go jednym kliknięciem. Przycisk „Nowy pies” zostawia dane opiekuna, a czyści tylko informacje o psie.
+  - Zgody zdrowotne i RODO nigdy nie są zapisywane — trzeba je potwierdzić przy każdej rezerwacji. Profil można usunąć przyciskiem „×”.
 - **Bezobsługowe zarządzanie z telefonu / Arkusza Google**:
   - Zarządzanie **nazwami zajęć, ikonami, opisami i limitami psów** bez edycji plików HTML.
   - Elastyczny **grafik pracy** (godziny domyślne, indywidualne dla dni tygodnia lub konkretnych dat, obsługa dni wolnych / urlopów).
@@ -181,7 +185,7 @@ Tworzona automatycznie przy pierwszym zdarzeniu. Zapisuje anonimowy lejek rezerw
 | 2026-10-26 18:13:02 | `formularz_wyslany` | Spacer socjalizacyjny · 2026-10-28 18:00 |
 | 2026-10-26 18:13:03 | `rezerwacja_przyjeta` | Spacer socjalizacyjny · 2026-10-28 18:00 |
 
-Zdarzenia: `usluga_wybrana`, `termin_wybrany`, `formularz_wyslany`, `rezerwacja_przyjeta`, `rezerwacja_konflikt`, `rezerwacja_blad`, `dodaj_do_kalendarza`.
+Zdarzenia: `usluga_wybrana`, `termin_wybrany`, `formularz_wyslany`, `rezerwacja_przyjeta`, `rezerwacja_konflikt`, `rezerwacja_blad`, `dodaj_do_kalendarza`, `profil_psa_zapisany`.
 
 ---
 

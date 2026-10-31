@@ -129,6 +129,21 @@ const rodoConsentInput   = document.getElementById('rodoConsent');
 // Ostatnia przyjęta rezerwacja (potrzebna do wygenerowania pliku .ics)
 let lastBooking = null;
 
+// Zapisane profile psów — wyłącznie localStorage przeglądarki użytkownika.
+const PROFILES_KEY = 'psiapsi_dog_profiles';
+const MAX_SAVED_PROFILES = 8;
+let savedProfiles = [];
+let lastProfileId = '';
+let activeProfileId = '';
+let pendingProfileSave = null;
+let profileAutofillApplied = false;
+
+const profilePanel    = document.getElementById('profilePanel');
+const profileChips    = document.getElementById('profileChips');
+const profileStatus   = document.getElementById('profileStatus');
+const saveProfileBox  = document.getElementById('saveProfileBox');
+const saveProfileBtn  = document.getElementById('saveProfileBtn');
+
 // Zabezpiecza dane pochodzące z arkusza i z formularza przed wstrzyknięciem HTML
 function escapeHtml(value) {
   return String(value == null ? '' : value)
@@ -1096,6 +1111,7 @@ function showStep3() {
   step3Section.classList.remove('s-step--hidden');
   step3Section.removeAttribute('aria-hidden');
   step3Section.focus({ preventScroll: true });
+  maybeAutofillProfile();
 }
 
 function hideStep3() {
@@ -1105,8 +1121,8 @@ function hideStep3() {
   }
 }
 
-// Czyści wybór terminu — także ukryte pola formularza i stan płci psa,
-// żeby po „Zarezerwuj kolejny termin” nic nie zostało z poprzedniego zapisu.
+// Czyści wybór terminu. Danych formularza nie ruszamy — przy „Zmień termin”
+// opiekun nie powinien wpisywać wszystkiego od nowa.
 function clearSelection() {
   selectedDateStr = '';
   selectedHour    = '';
@@ -1115,12 +1131,8 @@ function clearSelection() {
   if (bookingDateInput) bookingDateInput.value = '';
   if (timeSlotHidden)   timeSlotHidden.value   = '';
 
-  selectedGender = 'pies';
-  document.querySelectorAll('.s-gender-btn').forEach(b => {
-    const isActive = b.dataset.gender === 'pies';
-    b.classList.toggle('active', isActive);
-    b.setAttribute('aria-pressed', isActive ? 'true' : 'false');
-  });
+  activeProfileId = '';
+  renderProfilePanel();
 
   hideStep3();
 }
@@ -1205,16 +1217,261 @@ function updateMobileView() {
   }
 }
 
+// ── Profile psów (localStorage) ─────────────────────────────
+// Dane nie opuszczają przeglądarki: nie trafiają do arkusza ani do backendu.
+
+function profileKey(profile) {
+  return [profile.clientEmail, profile.dogName]
+    .map(value => String(value || '').trim().toLowerCase())
+    .join('||');
+}
+
+function readSavedProfiles() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(PROFILES_KEY) || 'null');
+    const list = Array.isArray(raw) ? raw
+      : (raw && Array.isArray(raw.profiles) ? raw.profiles : []);
+    lastProfileId = (raw && !Array.isArray(raw) && raw.lastId) || '';
+
+    return list
+      .filter(profile => profile && profile.dogName)
+      .map(profile => ({ ...profile, id: profileKey(profile) }));
+  } catch (err) {
+    return [];
+  }
+}
+
+function persistSavedProfiles() {
+  try {
+    localStorage.setItem(PROFILES_KEY, JSON.stringify({
+      v: 1,
+      lastId: lastProfileId,
+      profiles: savedProfiles
+    }));
+  } catch (err) {
+    // Tryb prywatny lub brak miejsca — rezerwacja nadal działa, tylko bez zapisu.
+  }
+}
+
+function setProfileStatus(message) {
+  if (!profileStatus) return;
+  profileStatus.textContent = message || '';
+  profileStatus.hidden = !message;
+}
+
+function fieldValue(id) {
+  const el = document.getElementById(id);
+  return el ? String(el.value || '').trim() : '';
+}
+
+function formHasData() {
+  return ['firstName', 'lastName', 'clientEmail', 'clientPhone', 'dogName', 'dogAge', 'dogNotes']
+    .some(id => fieldValue(id) !== '');
+}
+
+function setGender(gender) {
+  selectedGender = gender === 'suka' ? 'suka' : 'pies';
+  document.querySelectorAll('.s-gender-btn').forEach(btn => {
+    const isActive = btn.dataset.gender === selectedGender;
+    btn.classList.toggle('active', isActive);
+    btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+  });
+}
+
+function renderProfilePanel() {
+  if (!profilePanel || !profileChips) return;
+
+  if (!savedProfiles.length) {
+    profilePanel.hidden = true;
+    profileChips.innerHTML = '';
+    return;
+  }
+
+  profilePanel.hidden = false;
+  profileChips.innerHTML = '';
+
+  savedProfiles.forEach(profile => {
+    const chip = document.createElement('div');
+    chip.className = 's-profile-chip' + (profile.id === activeProfileId ? ' is-active' : '');
+    chip.setAttribute('role', 'listitem');
+
+    const pick = document.createElement('button');
+    pick.type = 'button';
+    pick.className = 's-profile-pick';
+    pick.dataset.profileId = profile.id;
+
+    const ownerName = [profile.firstName, profile.lastName].filter(Boolean).join(' ');
+    pick.setAttribute('aria-label',
+      `Wypełnij danymi zapisanego psa: ${profile.dogName}${ownerName ? ', ' + ownerName : ''}`);
+
+    const dogName = document.createElement('span');
+    dogName.className = 's-profile-dog';
+    dogName.textContent = `🐕 ${profile.dogName}`;
+
+    const owner = document.createElement('span');
+    owner.className = 's-profile-owner';
+    owner.textContent = ownerName || 'Zapisany opiekun';
+
+    pick.append(dogName, owner);
+
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 's-profile-delete';
+    remove.dataset.deleteProfile = profile.id;
+    remove.setAttribute('aria-label', `Usuń zapisany profil psa ${profile.dogName}`);
+    remove.title = 'Usuń profil';
+    remove.textContent = '×';
+
+    chip.append(pick, remove);
+    profileChips.appendChild(chip);
+  });
+
+  // Nowy pies: czyści dane psa, ale zostawia kontakt opiekuna.
+  const newDogBtn = document.createElement('button');
+  newDogBtn.type = 'button';
+  newDogBtn.className = 's-profile-new';
+  newDogBtn.textContent = '＋ Nowy pies';
+  newDogBtn.addEventListener('click', startNewDog);
+  profileChips.appendChild(newDogBtn);
+}
+
+function applyProfile(profile) {
+  if (!profile) return;
+
+  ['firstName', 'lastName', 'clientEmail', 'clientPhone', 'dogName', 'dogAge', 'dogNotes']
+    .forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = profile[id] == null ? '' : profile[id];
+    });
+
+  setGender(profile.dogGender);
+
+  if (dogSociabilityInput && profile.dogSociability) {
+    const exists = Array.from(dogSociabilityInput.options)
+      .some(option => option.value === profile.dogSociability);
+    if (exists) dogSociabilityInput.value = profile.dogSociability;
+  }
+
+  activeProfileId = profile.id || profileKey(profile);
+  lastProfileId = activeProfileId;
+  profileAutofillApplied = true;
+  persistSavedProfiles();
+  renderProfilePanel();
+  setProfileStatus(`Uzupełniono danymi: 🐕 ${profile.dogName}. Możesz wszystko zmienić.`);
+}
+
+function startNewDog() {
+  ['dogName', 'dogAge', 'dogNotes'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+
+  setGender('pies');
+  if (dogSociabilityInput) dogSociabilityInput.selectedIndex = 0;
+
+  activeProfileId = '';
+  profileAutofillApplied = true;
+  renderProfilePanel();
+  setProfileStatus('Wpisz dane nowego psa — dane opiekuna zostają bez zmian.');
+  document.getElementById('dogName')?.focus();
+}
+
+function maybeAutofillProfile() {
+  if (profileAutofillApplied || activeProfileId || !savedProfiles.length || formHasData()) return;
+
+  const profile = savedProfiles.find(item => item.id === lastProfileId) || savedProfiles[0];
+  if (profile) applyProfile(profile);
+}
+
+function upsertSavedProfile(profile) {
+  const normalized = { ...profile, id: profileKey(profile), updatedAt: new Date().toISOString() };
+  const index = savedProfiles.findIndex(item => item.id === normalized.id);
+
+  if (index >= 0) savedProfiles[index] = normalized;
+  else savedProfiles.unshift(normalized);
+
+  savedProfiles.sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+  savedProfiles = savedProfiles.slice(0, MAX_SAVED_PROFILES);
+  lastProfileId = normalized.id;
+
+  persistSavedProfiles();
+  renderProfilePanel();
+  return normalized;
+}
+
+function initSavedProfiles() {
+  savedProfiles = readSavedProfiles();
+  if (!savedProfiles.some(profile => profile.id === lastProfileId)) {
+    lastProfileId = savedProfiles[0] ? savedProfiles[0].id : '';
+  }
+  renderProfilePanel();
+}
+
+function prepareProfileAfterBooking(profile) {
+  pendingProfileSave = null;
+  if (saveProfileBox) saveProfileBox.hidden = true;
+  if (saveProfileBtn) {
+    saveProfileBtn.disabled = false;
+    saveProfileBtn.textContent = '🐾 Zapisz dane psa';
+  }
+
+  if (!profile.dogName || !profile.clientEmail) return;
+
+  // Profil już zapisany wcześniej — aktualizujemy go po cichu świeżymi danymi.
+  const exists = savedProfiles.some(item => item.id === profileKey(profile));
+  if (exists) {
+    upsertSavedProfile(profile);
+    return;
+  }
+
+  // Nowy pies: zapis dopiero po świadomym kliknięciu na ekranie sukcesu.
+  pendingProfileSave = profile;
+  if (saveProfileBox) saveProfileBox.hidden = false;
+}
+
+if (profileChips) {
+  profileChips.addEventListener('click', (e) => {
+    const pick = e.target.closest('.s-profile-pick');
+    if (pick) {
+      const profile = savedProfiles.find(item => item.id === pick.dataset.profileId);
+      if (profile) applyProfile(profile);
+      return;
+    }
+
+    const remove = e.target.closest('.s-profile-delete');
+    if (!remove) return;
+
+    const profile = savedProfiles.find(item => item.id === remove.dataset.deleteProfile);
+    if (!profile) return;
+    if (!window.confirm(`Usunąć zapisany profil psa „${profile.dogName}”?`)) return;
+
+    savedProfiles = savedProfiles.filter(item => item.id !== profile.id);
+    if (activeProfileId === profile.id) activeProfileId = '';
+    if (lastProfileId === profile.id) lastProfileId = savedProfiles[0] ? savedProfiles[0].id : '';
+
+    persistSavedProfiles();
+    renderProfilePanel();
+    setProfileStatus(`Usunięto zapisany profil: 🐕 ${profile.dogName}.`);
+  });
+}
+
+if (saveProfileBtn) {
+  saveProfileBtn.addEventListener('click', () => {
+    if (!pendingProfileSave) return;
+
+    upsertSavedProfile(pendingProfileSave);
+    pendingProfileSave = null;
+    saveProfileBtn.disabled = true;
+    saveProfileBtn.textContent = '✓ Zapisano na tym urządzeniu';
+    track('profil_psa_zapisany', '');
+  });
+}
+
 // ── Płeć psa ────────────────────────────────────────────────
 
 document.querySelectorAll('.s-gender-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.s-gender-btn').forEach(b => {
-      const isActive = b === btn;
-      b.classList.toggle('active', isActive);
-      b.setAttribute('aria-pressed', isActive ? 'true' : 'false');
-    });
-    selectedGender = btn.dataset.gender;
+    setGender(btn.dataset.gender);
   });
 });
 
@@ -1310,6 +1567,19 @@ if (spotkaniaForm) {
           `;
         }
 
+        // Zapis/aktualizacja profilu musi nastąpić przed wyczyszczeniem formularza.
+        prepareProfileAfterBooking({
+          firstName,
+          lastName,
+          clientEmail,
+          clientPhone,
+          dogName,
+          dogAge,
+          dogGender:      selectedGender,
+          dogSociability: payload.dogSociability,
+          dogNotes:       payload.dogNotes
+        });
+
         track('rezerwacja_przyjeta', `${selectedService} · ${selectedDateStr} ${selectedHour}`);
 
         hideStep3();
@@ -1320,6 +1590,10 @@ if (spotkaniaForm) {
         }
 
         spotkaniaForm.reset();
+        setGender('pies');
+        activeProfileId = '';
+        profileAutofillApplied = false;
+        setProfileStatus('');
         selectedDateStr = '';
         selectedHour    = '';
         renderCalendar();
@@ -1461,6 +1735,7 @@ if (mobileNextDayBtn) {
 // ── Inicjalizacja ───────────────────────────────────────────
 // Renderujemy natychmiast z pamięci podręcznej (brak migotania),
 // a następnie w tle odświeżamy dane z Arkusza Google.
+initSavedProfiles();
 renderServices();
 renderPricing();
 renderCalendar();

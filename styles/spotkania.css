@@ -886,6 +886,139 @@ body {
 
 .s-optional { font-weight: 500; text-transform: none; letter-spacing: 0; color: #9AA0A6; }
 
+/* ── Zapisane profile psów (localStorage) ─────────────────── */
+
+.s-profile-panel {
+  margin: -0.2rem 0 1.5rem;
+  padding: 1rem 1.1rem;
+  background: linear-gradient(180deg, var(--brand-tint) 0%, #FFFFFF 100%);
+  border: 1px dashed var(--border-green);
+  border-radius: var(--radius-sm);
+}
+
+.s-profile-panel[hidden],
+.s-profile-status[hidden],
+.s-save-profile[hidden] { display: none; }
+
+.s-profile-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: .4rem .75rem;
+  margin-bottom: .7rem;
+}
+
+.s-profile-title {
+  font-size: .8rem;
+  font-weight: 700;
+  color: var(--brand-dark);
+  letter-spacing: .01em;
+}
+
+.s-profile-badge {
+  font-size: .65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--brand);
+  background: rgba(255,255,255,.75);
+  border: 1px solid var(--border-green);
+  border-radius: var(--radius-pill);
+  padding: .15rem .55rem;
+}
+
+.s-profile-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+}
+
+.s-profile-chip {
+  display: flex;
+  align-items: stretch;
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  transition: border-color .18s, box-shadow .18s;
+}
+
+.s-profile-chip:hover { border-color: var(--border-green); }
+
+.s-profile-chip.is-active {
+  border-color: var(--brand);
+  box-shadow: 0 3px 10px rgba(27,107,80,.18);
+}
+
+.s-profile-pick {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: .05rem;
+  padding: .42rem .85rem;
+  border: none;
+  background: transparent;
+  font-family: var(--font);
+  text-align: left;
+  cursor: pointer;
+}
+
+.s-profile-dog {
+  font-size: .82rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.25;
+}
+
+.s-profile-owner {
+  font-size: .68rem;
+  color: var(--text-muted);
+  line-height: 1.25;
+}
+
+.s-profile-delete {
+  width: 30px;
+  border: none;
+  border-left: 1px solid var(--border);
+  background: transparent;
+  color: #9AA0A6;
+  font-size: 1.05rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background .18s, color .18s;
+}
+
+.s-profile-delete:hover {
+  background: #FBEAEA;
+  color: #B42318;
+}
+
+.s-profile-new {
+  padding: .45rem .85rem;
+  border: 1.5px dashed var(--border-green);
+  border-radius: var(--radius-pill);
+  background: rgba(255,255,255,.6);
+  font-family: var(--font);
+  font-size: .76rem;
+  font-weight: 600;
+  color: var(--brand-dark);
+  cursor: pointer;
+  transition: background .18s, border-color .18s;
+}
+
+.s-profile-new:hover {
+  background: var(--white);
+  border-color: var(--brand);
+}
+
+.s-profile-status {
+  margin-top: .65rem;
+  font-size: .74rem;
+  line-height: 1.45;
+  color: var(--brand-dark);
+}
+
 /* ── Zgody (zdrowie psa + RODO) ───────────────────────────── */
 
 .s-consents {
@@ -1069,6 +1202,68 @@ body {
   background: var(--brand-soft);
   border-color: var(--border-green);
   color: var(--brand-dark);
+}
+
+/* ── Ekran sukcesu: zapis profilu psa ─────────────────────── */
+
+.s-save-profile {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: .85rem 1.1rem;
+  width: 100%;
+  margin-top: 1rem;
+  padding: .95rem 1.1rem;
+  text-align: left;
+  background: linear-gradient(135deg, var(--brand-tint) 0%, #FFFFFF 100%);
+  border: 1px solid var(--border-green);
+  border-radius: var(--radius-sm);
+}
+
+.s-save-profile-text {
+  display: flex;
+  flex-direction: column;
+  gap: .18rem;
+  flex: 1 1 220px;
+}
+
+.s-save-profile-text strong {
+  font-family: var(--font-display);
+  font-size: .92rem;
+  font-weight: 700;
+  color: var(--brand-dark);
+}
+
+.s-save-profile-text span {
+  font-size: .76rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.s-save-profile-btn {
+  flex-shrink: 0;
+  padding: .6rem 1.05rem;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--brand);
+  font-family: var(--font);
+  font-size: .8rem;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+  transition: background .18s, transform .12s;
+}
+
+.s-save-profile-btn:hover:not(:disabled) {
+  background: var(--brand-dark);
+  transform: translateY(-1px);
+}
+
+.s-save-profile-btn:disabled {
+  background: var(--brand-soft);
+  color: var(--brand-dark);
+  cursor: default;
 }
 
 /* ── Nawigacja w nagłówku ─────────────────────────────────── */
