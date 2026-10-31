@@ -585,12 +585,6 @@ body {
   border-bottom-style: dashed;
 }
 
-/* Dzień, w którym są tylko inne zajęcia niż wybrane — ma zostać zauważony */
-.s-day-col.is-other .s-day-col-header {
-  opacity: .8;
-  border-bottom-style: dashed;
-}
-
 /* Dzień wolny: subtelna kreska zamiast zupełnie pustej kolumny */
 .s-slot-empty {
   display: flex;
@@ -599,57 +593,6 @@ body {
   min-height: 3.4rem;
   font-size: 1.1rem;
   color: #D8D4CC;
-}
-
-/* Dzień z samymi innymi zajęciami: „tylko Posłuszeństwo” zamiast kreski.
-   Nazwa jest przyciskiem — klient jednym kliknięciem przeskakuje na te zajęcia. */
-.s-slot-hint {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  gap: .22rem;
-  min-height: 3.4rem;
-  padding: .45rem .4rem;
-  border: 1px dashed var(--border);
-  border-radius: .55rem;
-  background: rgba(255, 255, 255, .45);
-}
-.s-slot-hint-label {
-  font-size: .6rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .07em;
-  color: var(--text-muted);
-}
-.s-slot-hint-btn {
-  padding: 0;
-  border: 0;
-  background: none;
-  font: inherit;
-  font-size: .74rem;
-  font-weight: 600;
-  line-height: 1.25;
-  text-align: left;
-  color: var(--brand-dark);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  cursor: pointer;
-  overflow-wrap: anywhere;
-}
-/* Wariant pod slotami: ten sam dzień ma też godziny na inne zajęcia */
-.s-slot-hint--inline {
-  min-height: 0;
-  padding: .35rem .45rem;
-  margin-top: .05rem;
-  background: transparent;
-}
-
-.s-slot-hint-btn:hover { color: var(--brand); }
-.s-slot-hint-btn:focus-visible {
-  outline: 2px solid var(--brand);
-  outline-offset: 2px;
-  border-radius: 2px;
 }
 
 /* Desktop: pełny tydzień */
@@ -787,6 +730,17 @@ body {
   border-color: var(--brand);
   color: #fff;
   box-shadow: 0 6px 16px rgba(27,107,80,.32);
+}
+
+/* Nazwa zajęć — druga linia pod godziną, zawsze widoczna. Kolor dziedziczy
+   po stanie slotu, więc kafelek zachowuje standardowy wygląd. */
+.s-slot-service {
+  max-width: 100%;
+  font-size: .62rem;
+  font-weight: 500;
+  line-height: 1.15;
+  color: inherit;
+  overflow-wrap: anywhere;
 }
 
 /* ── Legenda ──────────────────────────────────────────────── */
@@ -1827,11 +1781,8 @@ body {
     gap: .65rem;
   }
 
-  /* Widoczny jest tylko jeden dzień — kreska i podpowiedź zajmują pełną szerokość */
+  /* Widoczny jest tylko jeden dzień — kreska zajmuje pełną szerokość */
   .s-slot-empty       { min-height: 68px; grid-column: 1 / -1; }
-  .s-slot-hint        { min-height: 68px; grid-column: 1 / -1; align-items: center; }
-  .s-slot-hint--inline { min-height: 0; align-items: flex-start; }
-  .s-slot-hint-btn    { font-size: .9rem; }
 
   .s-slot-btn {
     padding: .85rem .6rem;

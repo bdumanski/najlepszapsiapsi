@@ -18,11 +18,11 @@ Projekt łączy lekki frontend HTML/CSS/JS z bezserwerowym backendem opartym na 
   2. Wybór terminu w kalendarzu tygodniowym (widok siatki na desktopie, responsywny selektor dni na telefonach).
 - **Dopracowany kalendarz tygodniowy**:
   - **Zbite kolumny dni** — żadnych pustych wierszy rozciągających siatkę, gdy godziny są od siebie odległe; przy wspólnym grafiku tygodnia godziny i tak leżą w jednej linii.
-  - **Godzina zakończenia** liczona z kolumny `Czas trwania` oraz licznik wolnych miejsc (`3/4`) na slotach grupowych.
+  - **Nazwa zajęć pod każdą godziną** — od razu widać, co odbywa się w danym terminie (przy zajętym slocie: usługa, która faktycznie go zajmuje). **Godzina zakończenia** liczona z kolumny `Czas trwania` oraz licznik wolnych miejsc (`3/4`) na slotach grupowych.
   - **„Najbliższy wolny termin”** — jednym kliknięciem przeskakuje do najwcześniejszego wolnego okna (szuka do 60 dni w przód).
   - **Nawigacja klawiaturą** — Tab wchodzi do siatki raz, dalej poruszamy się strzałkami (pion zostaje w wybranym dniu).
   - Jedno źródło prawdy dla dostępności (`getSlotState`), więc kropka pod dniem zawsze zgadza się z siatką i uwzględnia wybrane zajęcia.
-  - **Dzień z innymi zajęciami** — gdy wybrane zajęcia nie mają w danym dniu terminów, a inne mają, w kolumnie pojawia się np. „tylko · 20:00 Posłuszeństwo” z klikalną nazwą (a nie myląca kreska). Jeśli dzień ma i jedne, i drugie zajęcia (np. 09:00 Rally-o i 18:00–20:00 spacery), pod slotami dopisujemy „także · 09:00 Rally-o”. Jedno kliknięcie przełącza zajęcia. Podpowiedź pokazuje się tylko w dniach, które różnią się od reszty tygodnia, żeby nie zagracać siatki.
+  - **Dzień z innymi zajęciami** — gdy wybrane zajęcia nie mają w danym dniu terminów, a inne mają, w kolumnie pojawiają się zwykłe kafelki tych godzin (ten sam wygląd i kolory co reszta kalendarza), z nazwą zajęć w drugiej linii i zamiast mylącej kreski. Jeśli dzień ma i jedne, i drugie zajęcia (np. 09:00 Rally-o i 18:00–20:00 spacery), godziny są pokazane razem w kolejności. Jedno kliknięcie przełącza zajęcia i od razu zaznacza ten termin. Inne zajęcia pokazujemy tylko w dniach, które różnią się od reszty tygodnia, żeby nie zagracać siatki.
   3. Formularz danych opiekuna i psa oraz automatycznie dopasowane lokalizacje.
 - **Bezobsługowe zarządzanie z telefonu / Arkusza Google**:
   - Zarządzanie **nazwami zajęć, ikonami, opisami i limitami psów** bez edycji plików HTML.

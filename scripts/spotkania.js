@@ -750,26 +750,42 @@ function getSlotState(dayDate, dateStr, hour, activeServiceObj) {
 
 // ── Renderowanie kalendarza (Krok 2) ──────────────────────────
 
-// Buduje pojedynczy przycisk terminu
-function buildSlot(day, hour, rowIndex, activeServiceObj) {
-  const info       = getSlotState(day.date, day.dateStr, hour, activeServiceObj);
-  const isSelected = (day.dateStr === selectedDateStr && hour === selectedHour);
+// Buduje pojedynczy przycisk terminu.
+// `otherServiceNames` jest ustawione dla godzin, które w tym dniu mają tylko
+// inne zajęcia (np. wybrano spacery, a o 18:00 jest salka). Taki slot wygląda
+// jak zwykły kafelek — z kolorem zależnym od dostępności — ale jego kliknięcie
+// przełącza wybrane zajęcia, tak jak dawna podpowiedź „tylko…”.
+function buildSlot(day, hour, rowIndex, activeServiceObj, otherServiceNames = null) {
+  const isOtherService  = Array.isArray(otherServiceNames) && otherServiceNames.length > 0;
+  const slotServiceObj  = isOtherService
+    ? (getServiceByName(otherServiceNames[0]) || activeServiceObj)
+    : activeServiceObj;
+  const info       = getSlotState(day.date, day.dateStr, hour, slotServiceObj);
+  const isSelected = !isOtherService && day.dateStr === selectedDateStr && hour === selectedHour;
   const blocked    = info.state === 'past' || info.state === 'full';
 
   const btn = document.createElement('button');
   btn.type      = 'button';
-  btn.className = 's-slot-btn is-' + info.state + (isSelected ? ' is-selected' : '');
+  btn.className = 's-slot-btn is-' + info.state + (isSelected ? ' is-selected' : '') + (isOtherService ? ' is-other-service' : '');
   btn.dataset.row  = String(rowIndex);
   btn.dataset.col  = String(day.index);
   btn.dataset.hour = hour;
   btn.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
 
-  // Drugi wiersz tylko wtedy, gdy niesie informację: licznik miejsc albo godzina końca.
-  let sub = '';
+  // Druga linia zawsze mówi, jakie zajęcia odbywają się o tej godzinie.
+  // Trzecia (gdy coś wnosi) to licznik miejsc albo godzina zakończenia.
+  const serviceLabel = isOtherService
+    ? otherServiceNames.join(', ')
+    : (info.service || selectedService);
+
+  let sub = serviceLabel
+    ? `<span class="s-slot-service">${escapeHtml(serviceLabel)}</span>`
+    : '';
+
   if (info.state === 'partial') {
-    sub = `<span class="s-slot-count">${info.groupCount}/${info.maxDogs}</span>`;
+    sub += `<span class="s-slot-count">${info.groupCount}/${info.maxDogs}</span>`;
   } else if (info.endTime) {
-    sub = `<span class="s-slot-end">do ${escapeHtml(info.endTime)}</span>`;
+    sub += `<span class="s-slot-end">do ${escapeHtml(info.endTime)}</span>`;
   }
 
   btn.innerHTML = `
@@ -779,13 +795,29 @@ function buildSlot(day, hour, rowIndex, activeServiceObj) {
 
   const dayLabel  = `${getPolishDayName(day.date)} ${formatDatePL(day.date)}`;
   const timeLabel = info.endTime ? `${hour}–${info.endTime}` : hour;
-  btn.setAttribute('aria-label', escapeHtml(`${dayLabel}, godz. ${timeLabel} — ${info.label}`));
+  const ariaLabel = isOtherService
+    ? `${dayLabel}, godz. ${timeLabel} — inne zajęcia: ${otherServiceNames.join(', ')}. Kliknij, aby przełączyć zajęcia`
+    : `${dayLabel}, godz. ${timeLabel} — ${info.label}`;
+  btn.setAttribute('aria-label', escapeHtml(ariaLabel));
+
+  if (isOtherService) {
+    btn.title = `Inne zajęcia: ${otherServiceNames.join(', ')} — kliknij, aby przełączyć`;
+  }
 
   if (blocked) {
     btn.disabled = true;
     btn.setAttribute('aria-disabled', 'true');
   } else {
-    btn.addEventListener('click', () => selectSlot(day.date, day.index, hour, info));
+    btn.addEventListener('click', () => {
+      if (isOtherService) {
+        // Przełączamy się na zajęcia, które odbywają się o tej godzinie,
+        // i od razu zaznaczamy ten termin — dokładnie jak dawna podpowiedź.
+        const tile = Array.from(document.querySelectorAll('.s-service-btn'))
+          .find(b => b.dataset.service === otherServiceNames[0]);
+        if (tile) tile.click();
+      }
+      selectSlot(day.date, day.index, hour, info);
+    });
   }
 
   return btn;
@@ -835,13 +867,11 @@ function renderCalendar() {
   studioGrid.innerHTML = '';
 
   days.forEach(day => {
-    const onlyOtherServices = day.hours.length === 0 && day.otherGroups.length > 0;
-
     const col = document.createElement('div');
     col.className = 's-day-col'
       + (day.today ? ' is-today' : '')
       + (day.index === selectedMobileDayIndex ? ' is-mobile-active' : '')
-      + (day.hours.length === 0 ? (onlyOtherServices ? ' is-other' : ' is-off') : '');
+      + (day.hours.length === 0 && day.otherGroups.length === 0 ? ' is-off' : '');
     col.dataset.dayIndex = day.index;
 
     const hdr = document.createElement('div');
@@ -852,25 +882,26 @@ function renderCalendar() {
     `;
     col.appendChild(hdr);
 
-    if (onlyOtherServices) {
-      col.appendChild(buildOtherHoursHint(day, 'tylko'));
-    } else if (day.hours.length === 0) {
-      // Dzień bez terminów — jedna kreska zamiast pustej kolumny
+    if (day.hours.length === 0 && day.otherGroups.length === 0) {
+      // Dzień bez żadnych terminów — jedna kreska zamiast pustej kolumny
       const off = document.createElement('span');
       off.className = 's-slot-empty';
       off.setAttribute('aria-hidden', 'true');
       off.textContent = '—';
       col.appendChild(off);
     } else {
-      day.hours.forEach((hour, rowIndex) => {
-        col.appendChild(buildSlot(day, hour, rowIndex, activeServiceObj));
+      // Wszystkie sloty dnia: wybrane zajęcia (aktywne) + inne (ten sam wygląd,
+      // ale kliknięcie przełącza zajęcia) — w kolejności godzinowej.
+      const allSlots = [];
+      day.hours.forEach(hour => allSlots.push({ hour, otherServices: null }));
+      day.otherGroups.forEach(group => {
+        group.hours.forEach(hour => allSlots.push({ hour, otherServices: group.services }));
       });
+      allSlots.sort((a, b) => compareHours(a.hour, b.hour));
 
-      // Ten sam dzień może mieć też godziny na inne zajęcia (np. rano salka,
-      // wieczorem spacery) — pokazujemy je pod slotami, zamiast je ukrywać.
-      if (day.otherGroups.length) {
-        col.appendChild(buildOtherHoursHint(day, 'także'));
-      }
+      allSlots.forEach((slot, rowIndex) => {
+        col.appendChild(buildSlot(day, slot.hour, rowIndex, activeServiceObj, slot.otherServices));
+      });
     }
 
     studioGrid.appendChild(col);
@@ -879,35 +910,6 @@ function renderCalendar() {
   applyRovingTabindex();
   renderDaysStrip();
   updateMobileView();
-}
-
-// Terminy na inne zajęcia w tym samym dniu. „tylko” — gdy wybrane zajęcia nie mają
-// wtedy nic, „także” — gdy mają, ale dzień zawiera też inne godziny.
-// Kliknięcie nazwy przełącza zajęcia, więc klient od razu widzi te terminy w siatce.
-function buildOtherHoursHint(day, labelText) {
-  const wrap = document.createElement('div');
-  wrap.className = 's-slot-hint' + (day.hours.length ? ' s-slot-hint--inline' : '');
-
-  const label = document.createElement('span');
-  label.className = 's-slot-hint-label';
-  label.textContent = labelText;
-  wrap.appendChild(label);
-
-  day.otherGroups.forEach(group => {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 's-slot-hint-btn';
-    btn.textContent = group.label + ' · ' + group.services.join(', ');
-    btn.setAttribute('aria-label', `Pokaż terminy: ${group.services.join(', ')} o ${group.label}, ${getPolishDayName(day.date)} ${formatDatePL(day.date)}`);
-    btn.addEventListener('click', () => {
-      const tile = Array.from(document.querySelectorAll('.s-service-btn'))
-        .find(b => b.dataset.service === group.services[0]);
-      if (tile) tile.click();
-    });
-    wrap.appendChild(btn);
-  });
-
-  return wrap;
 }
 
 // Cała siatka to jeden przystanek klawisza Tab — dalej poruszamy się strzałkami.
