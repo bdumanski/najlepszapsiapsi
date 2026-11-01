@@ -83,6 +83,10 @@ function doPost(e) {
     );
     var maxDogs = matchedConfig ? matchedConfig.maxDogs : (is1on1 ? 1 : 3);
 
+    // Ręczny limit z zakładki „Miejsca” ma pierwszeństwo przed domyślnym.
+    var manualCapacity = getCapacityForSlot_(spreadsheet, requestedDate, requestedTime);
+    if (manualCapacity !== null) maxDogs = manualCapacity;
+
     // 0. Czy w ogóle prowadzimy te zajęcia o tej godzinie? (Grafik, kolumna „Zajęcia”)
     var slotCheck = checkServiceSlot_(getScheduleConfig(spreadsheet), requestedDate, requestedTime, data.serviceType || '');
     if (!slotCheck.ok) {
@@ -90,6 +94,15 @@ function doPost(e) {
       return ContentService.createTextOutput(JSON.stringify({
         status: 'conflict',
         message: slotCheck.message
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // Termin ręcznie zamknięty w panelu (limit 0) — blokujemy każdy rodzaj zajęć.
+    if (maxDogs === 0) {
+      lock.releaseLock();
+      return ContentService.createTextOutput(JSON.stringify({
+        status: 'conflict',
+        message: 'Termin ' + requestedDate + ' o godz. ' + requestedTime + ' został ręcznie zamknięty.'
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
@@ -342,6 +355,7 @@ function doGet(e) {
       bookedSlots: bookedSlots,
       services: services,
       schedule: schedule,
+      capacityOverrides: getCapacityOverrides_(spreadsheet),
       testimonials: testimonials
     };
 
@@ -662,6 +676,56 @@ function checkServiceSlot_(schedule, dateStr, timeStr, serviceName) {
   return { ok: true };
 }
 
+// ── Ręczne limity miejsc na konkretny termin ─────────────────────────
+// Zakładka „Miejsca”: Data | Godzina | Maks. miejsc | Ostatnia zmiana
+// Puste/brak wpisu = domyślny limit z zakładki „Uslugi”.
+// Wartość 0 oznacza ręcznie zamknięty termin.
+function getCapacityOverrides_(spreadsheet) {
+  var sheet = spreadsheet.getSheetByName('Miejsca');
+  if (!sheet) return [];
+
+  var tz = spreadsheet.getSpreadsheetTimeZone() || 'Europe/Warsaw';
+  var data = sheet.getDataRange().getValues();
+  var list = [];
+  var seen = {};
+
+  for (var i = 1; i < data.length; i++) {
+    var date = formatSheetDate(data[i][0], tz);
+    var time = formatSheetTime(data[i][1], tz);
+    var maxDogs = parseInt(data[i][2], 10);
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) continue;
+    if (isNaN(maxDogs) || maxDogs < 0) continue;
+
+    var key = date + '|' + time;
+    if (seen[key]) continue;
+    seen[key] = true;
+
+    list.push({
+      date: date,
+      timeSlot: time,
+      maxDogs: Math.min(maxDogs, 50)
+    });
+  }
+
+  list.sort(function (a, b) {
+    if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+    return compareHours_(a.timeSlot, b.timeSlot);
+  });
+
+  return list;
+}
+
+function getCapacityForSlot_(spreadsheet, date, time) {
+  var overrides = getCapacityOverrides_(spreadsheet);
+  for (var i = 0; i < overrides.length; i++) {
+    if (overrides[i].date === date && overrides[i].timeSlot === time) {
+      return overrides[i].maxDogs;
+    }
+  }
+  return null;
+}
+
 // Bezpieczne formatowanie daty z arkusza
 function formatSheetDate(val, tz) {
   if (!val) return '';
@@ -876,7 +940,8 @@ function adminGetGrafik_(spreadsheet) {
     weekdays: {},
     dates: [],
     extraRows: [],
-    services: getServicesConfig(spreadsheet).map(function (s) { return s.name; })
+    services: getServicesConfig(spreadsheet).map(function (s) { return s.name; }),
+    capacityOverrides: getCapacityOverrides_(spreadsheet)
   };
 
   var sheet = spreadsheet.getSheetByName('Grafik');
@@ -1041,6 +1106,40 @@ function adminSaveGrafik_(spreadsheet, payload) {
     return [String(row[0] || ''), String(row[1] || ''), String(row[2] || '')];
   });
 
+  // Ręczne limity miejsc. Brak klucza w payloadzie = stary panel, więc nie
+  // nadpisujemy istniejącej zakładki „Miejsca”.
+  var capacityRows = null;
+  if (payload.capacityOverrides instanceof Array) {
+    capacityRows = [];
+    var seenCapacity = {};
+
+    for (var c = 0; c < payload.capacityOverrides.length; c++) {
+      var cap = payload.capacityOverrides[c] || {};
+      var capDate = String(cap.date || '').trim();
+      var capTime = normalizeTime(String(cap.timeSlot || cap.time || '').trim());
+      var capMax = parseInt(cap.maxDogs, 10);
+
+      if (!ADMIN_DATE_RE.test(capDate) || !ADMIN_TIME_RE.test(capTime)
+          || isNaN(capMax) || capMax < 0 || capMax > 50) {
+        return {
+          status: 'error',
+          code: 'validation',
+          message: 'Nieprawidłowy ręczny limit miejsc. Podaj datę, godzinę i liczbę miejsc od 0 do 50.'
+        };
+      }
+
+      var capKey = capDate + '|' + capTime;
+      if (seenCapacity[capKey]) continue;
+      seenCapacity[capKey] = true;
+      capacityRows.push([capDate, capTime, capMax]);
+    }
+
+    capacityRows.sort(function (a, b) {
+      if (a[0] !== b[0]) return a[0] < b[0] ? -1 : 1;
+      return adminMinutes_(a[1]) - adminMinutes_(b[1]);
+    });
+  }
+
   return adminWithLock_(function () {
     var sheet = spreadsheet.getSheetByName('Grafik') || spreadsheet.insertSheet('Grafik');
     sheet.clearContents();
@@ -1053,7 +1152,31 @@ function adminSaveGrafik_(spreadsheet, payload) {
     var rows = [['Domyślne', defaultHours.join(', '), defaultServices.join(', ')]].concat(weekdayRows, dateRows, extraRows);
     sheet.getRange(2, 1, rows.length, 3).setValues(rows);
 
-    return { status: 'success', rows: rows.length };
+    if (capacityRows) {
+      var capSheet = spreadsheet.getSheetByName('Miejsca') || spreadsheet.insertSheet('Miejsca');
+      capSheet.clearContents();
+      capSheet.getRange(1, 1, 1, 4).setValues([[
+        'Data',
+        'Godzina',
+        'Maks. miejsc (0 = zamknięty)',
+        'Ostatnia zmiana'
+      ]]);
+
+      if (capacityRows.length > 0) {
+        var tz = spreadsheet.getSpreadsheetTimeZone() || 'Europe/Warsaw';
+        var changedAt = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd HH:mm');
+        var capValues = capacityRows.map(function (row) {
+          return [row[0], row[1], row[2], changedAt];
+        });
+        capSheet.getRange(2, 1, capValues.length, 4).setValues(capValues);
+      }
+    }
+
+    return {
+      status: 'success',
+      rows: rows.length,
+      capacityRows: capacityRows ? capacityRows.length : null
+    };
   });
 }
 

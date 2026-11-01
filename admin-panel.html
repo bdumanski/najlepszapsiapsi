@@ -455,6 +455,37 @@
           <button class="btn secondary" id="addException" type="button">Dodaj wyjątek dla tej daty</button>
         </div>
         <div id="exceptionList" class="stack" style="margin-top:.6rem"></div>
+
+        <h2 class="section-title">Ręczne limity miejsc</h2>
+        <p class="hint">
+          Domyślnie obowiązuje limit psów z zakładki „Zajęcia”. Tutaj możesz go zmienić
+          dla konkretnej daty i godziny — np. zmniejszyć do 2, gdy w grupie jest pies
+          wymagający większego dystansu. Godziny wybierasz z terminów dostępnych w grafiku
+          na wybrany dzień, a wpisanie 0 zamyka cały termin.
+        </p>
+        <div class="card" style="margin-top:.6rem">
+          <div class="grid-2">
+            <label class="field">
+              <span>Data</span>
+              <input type="date" id="capacityDate">
+            </label>
+            <label class="field">
+              <span>Godzina</span>
+              <select id="capacityTime"></select>
+            </label>
+          </div>
+          <div class="grid-2" style="margin-top:.6rem">
+            <label class="field">
+              <span>Liczba miejsc (0 = zamknięty)</span>
+              <input type="number" id="capacityMax" min="0" max="50" step="1" inputmode="numeric" placeholder="np. 2">
+            </label>
+            <div class="field" style="justify-content:flex-end">
+              <button class="btn secondary" id="addCapacity" type="button">Ustaw limit</button>
+            </div>
+          </div>
+          <p class="hint" id="capacityHoursHint"></p>
+        </div>
+        <div id="capacityList" class="stack" style="margin-top:.6rem"></div>
       </section>
 
       <!-- ── Zajęcia ────────────────────────────────────────── -->
@@ -537,6 +568,8 @@
        'savebar', 'savebarText', 'saveBtn', 'toast', 'weekdayList', 'chipsDefault',
        'exceptionDate', 'exceptionOff', 'chipsException', 'chipsDefaultServices',
        'chipsExceptionServices', 'addException', 'exceptionList',
+       'capacityDate', 'capacityTime', 'capacityMax', 'addCapacity', 'capacityList',
+       'capacityHoursHint',
        'serviceList', 'uslugiHint', 'addService', 'fromDate', 'toDate', 'refreshBookings',
        'bookingsSummary', 'bookingList', 'earnDone', 'earnDoneMeta', 'earnPlanned',
        'earnPlannedMeta', 'earnTotal', 'earnTotalMeta', 'earnNote',
@@ -547,6 +580,8 @@
       el.saveBtn.addEventListener('click', onSave);
       el.addException.addEventListener('click', onAddException);
       el.exceptionOff.addEventListener('change', syncExceptionOffState);
+      el.addCapacity.addEventListener('click', onAddCapacity);
+      el.capacityDate.addEventListener('change', renderCapacityTimeOptions);
       el.addService.addEventListener('click', onAddService);
       el.refreshBookings.addEventListener('click', onRefreshBookings);
 
@@ -557,6 +592,7 @@
       var today = new Date();
       el.fromDate.value = iso(today);
       el.toDate.value = iso(addDays(today, 14));
+      el.capacityDate.value = iso(today);
 
       if (!hasRunner()) {
         showLogin();
@@ -750,6 +786,17 @@
               services: (entry.services || []).slice()
             };
           }),
+          capacityOverrides: (res.capacityOverrides || []).map(function (entry) {
+            return {
+              date: String(entry.date || ''),
+              timeSlot: String(entry.timeSlot || entry.time || ''),
+              maxDogs: parseInt(entry.maxDogs, 10)
+            };
+          }).filter(function (entry) {
+            return /^\d{4}-\d{2}-\d{2}$/.test(entry.date)
+              && /^([01]\d|2[0-3]):[0-5]\d$/.test(entry.timeSlot)
+              && !isNaN(entry.maxDogs);
+          }),
           extraRows: res.extraRows || [],
           services: res.services || []
         };
@@ -802,6 +849,7 @@
       renderExceptionChips();
       renderWeekdays();
       renderExceptions();
+      renderCapacityOverrides();
     }
 
     // Które zajęcia mogą się odbywać w danych godzinach. Pusto = wszystkie.
@@ -962,6 +1010,8 @@
 
         el.weekdayList.appendChild(card);
       });
+
+      renderCapacityTimeOptions();
     }
 
     function setDayMode(key, mode) {
@@ -987,6 +1037,7 @@
         empty.className = 'muted';
         empty.textContent = 'Brak wyjątków — obowiązuje zwykły grafik tygodnia.';
         el.exceptionList.appendChild(empty);
+        renderCapacityTimeOptions();
         return;
       }
 
@@ -1026,6 +1077,175 @@
 
         el.exceptionList.appendChild(card);
       });
+
+      renderCapacityTimeOptions();
+    }
+
+    // Godziny obowiązujące w wybranym dniu — taka sama kolejność jak na stronie:
+    // wyjątek daty → wpis dnia tygodnia → godziny domyślne.
+    function capacityHoursForDate(date) {
+      if (!state.grafik || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return [];
+
+      var dateEntries = (state.grafik.dates || []).filter(function (entry) {
+        return entry.date === date;
+      });
+
+      if (dateEntries.length) {
+        var hours = [];
+        dateEntries.forEach(function (entry) {
+          (entry.hours || []).forEach(function (hour) {
+            if (hours.indexOf(hour) === -1) hours.push(hour);
+          });
+        });
+        return uniqueSorted(hours);
+      }
+
+      var parts = date.split('-');
+      var day = new Date(
+        parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10)
+      ).getDay();
+      var key = DAYS[day === 0 ? 6 : day - 1].toLowerCase();
+
+      if (Object.prototype.hasOwnProperty.call(state.grafik.weekdays, key)) {
+        return uniqueSorted(state.grafik.weekdays[key].hours || []);
+      }
+
+      return uniqueSorted(adminDefaultHours());
+    }
+
+    // Lista godzin do wyboru zamiast ręcznego wpisywania — tylko terminy z grafiku.
+    function renderCapacityTimeOptions() {
+      if (!el.capacityTime || !state.grafik) return;
+
+      var date = String(el.capacityDate.value || '').trim();
+      var previous = el.capacityTime.value;
+      var hours = capacityHoursForDate(date);
+
+      el.capacityTime.innerHTML = '';
+
+      if (!hours.length) {
+        var none = document.createElement('option');
+        none.value = '';
+        none.textContent = date ? 'brak dostępnych godzin' : 'najpierw wybierz datę';
+        el.capacityTime.appendChild(none);
+        el.capacityTime.disabled = true;
+        el.addCapacity.disabled = true;
+        el.capacityHoursHint.textContent = date
+          ? 'Ten dzień jest wolny w grafiku — nie ma godziny, dla której można ustawić limit.'
+          : 'Wybierz datę, żeby zobaczyć godziny z grafiku.';
+        return;
+      }
+
+      el.capacityTime.disabled = false;
+      el.addCapacity.disabled = false;
+      hours.forEach(function (hour) {
+        var option = document.createElement('option');
+        option.value = hour;
+        option.textContent = hour;
+        el.capacityTime.appendChild(option);
+      });
+
+      if (hours.indexOf(previous) !== -1) el.capacityTime.value = previous;
+
+      el.capacityHoursHint.textContent = 'Godziny z grafiku na ' + formatDayPL(date)
+        + '. Domyślny limit pochodzi z oferty — tutaj zmieniasz go tylko dla wybranego terminu.';
+    }
+
+    // Ręczne limity miejsc na konkretny termin (zakładka „Miejsca”).
+    function renderCapacityOverrides() {
+      if (!el.capacityList || !state.grafik) return;
+      el.capacityList.innerHTML = '';
+
+      var list = state.grafik.capacityOverrides || [];
+      sortCapacity(list);
+
+      if (!list.length) {
+        var empty = document.createElement('p');
+        empty.className = 'muted';
+        empty.textContent = 'Brak ręcznych limitów — wszędzie obowiązuje domyślna liczba miejsc z oferty.';
+        el.capacityList.appendChild(empty);
+        return;
+      }
+
+      list.forEach(function (entry, index) {
+        var card = document.createElement('div');
+        card.className = 'card exception';
+
+        var info = document.createElement('div');
+        var dateLine = document.createElement('div');
+        dateLine.className = 'exception-date';
+        dateLine.textContent = formatDayPL(entry.date);
+        var detailLine = document.createElement('div');
+        detailLine.className = 'exception-hours';
+        detailLine.textContent = 'godz. ' + entry.timeSlot + ' — ' + capacityLabel(entry.maxDogs);
+        info.appendChild(dateLine);
+        info.appendChild(detailLine);
+        card.appendChild(info);
+
+        var remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'btn danger small';
+        remove.textContent = 'Usuń';
+        remove.addEventListener('click', function () {
+          state.grafik.capacityOverrides.splice(index, 1);
+          markDirty('grafik');
+          renderCapacityOverrides();
+        });
+        card.appendChild(remove);
+
+        el.capacityList.appendChild(card);
+      });
+    }
+
+    function sortCapacity(list) {
+      (list || []).sort(function (a, b) {
+        if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+        return minutes(a.timeSlot) - minutes(b.timeSlot);
+      });
+    }
+
+    function capacityLabel(max) {
+      if (max === 0) return 'termin zamknięty';
+      var mod10 = max % 10;
+      var mod100 = max % 100;
+      var word = (max === 1) ? 'miejsce'
+        : (mod10 >= 2 && mod10 <= 4 && !(mod100 >= 12 && mod100 <= 14)) ? 'miejsca'
+        : 'miejsc';
+      return 'limit ' + max + ' ' + word;
+    }
+
+    function onAddCapacity() {
+      var date = String(el.capacityDate.value || '').trim();
+      var time = String(el.capacityTime.value || '').trim();
+      var max = parseInt(el.capacityMax.value, 10);
+
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        toast('Wybierz datę.', true);
+        return;
+      }
+      if (!time || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) {
+        toast('Ten dzień nie ma dostępnych godzin w grafiku.', true);
+        return;
+      }
+      if (isNaN(max) || max < 0 || max > 50) {
+        toast('Podaj liczbę miejsc od 0 do 50 (0 zamyka termin).', true);
+        return;
+      }
+
+      var entry = { date: date, timeSlot: time, maxDogs: max };
+      var existingIndex = -1;
+      state.grafik.capacityOverrides.forEach(function (item, index) {
+        if (item.date === date && item.timeSlot === time) existingIndex = index;
+      });
+
+      if (existingIndex !== -1) state.grafik.capacityOverrides[existingIndex] = entry;
+      else state.grafik.capacityOverrides.push(entry);
+
+      sortCapacity(state.grafik.capacityOverrides);
+      el.capacityMax.value = '';
+      markDirty('grafik');
+      renderCapacityOverrides();
+      toast('Limit ustawiony — zapisz zmiany, żeby trafił na stronę.');
     }
 
     function onAddException() {
@@ -1088,6 +1308,7 @@
         'default': state.grafik['default'],
         weekdays: state.grafik.weekdays,
         dates: state.grafik.dates,
+        capacityOverrides: state.grafik.capacityOverrides,
         extraRows: state.grafik.extraRows
       }).then(function () {
         state.grafikDirty = false;

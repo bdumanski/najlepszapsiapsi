@@ -81,6 +81,7 @@ let scheduleConfig = {
 // ── Stan aplikacji ──────────────────────────────────────────
 let currentMonday        = getMonday(new Date());
 let bookedData           = [];
+let capacityOverrides    = [];
 let selectedService      = 'Spacer socjalizacyjny';
 let selectedGender       = 'pies';
 let selectedDateStr      = '';
@@ -357,6 +358,11 @@ try {
     const parsedBookings = JSON.parse(cachedBookings);
     if (Array.isArray(parsedBookings)) bookedData = parsedBookings;
   }
+  const cachedCapacity = localStorage.getItem('psiapsi_capacity_cache');
+  if (cachedCapacity) {
+    const parsedCapacity = JSON.parse(cachedCapacity);
+    if (Array.isArray(parsedCapacity)) capacityOverrides = parsedCapacity;
+  }
 } catch (e) {
   // Ignoruj błędy localStorage
 }
@@ -385,7 +391,23 @@ async function fetchBookings() {
         } catch (e) {}
       }
 
-      // 2. Usługi (jeśli skonfigurowane w arkuszu)
+      // 2. Ręczne limity miejsc na konkretny termin
+      if (Array.isArray(json.capacityOverrides)) {
+        capacityOverrides = json.capacityOverrides.map(item => {
+          const max = parseInt(item.maxDogs, 10);
+          return {
+            date:     normalizeDate(item.date),
+            timeSlot: normalizeTime(item.timeSlot),
+            maxDogs:  Number.isFinite(max) ? Math.max(0, Math.min(50, max)) : null
+          };
+        }).filter(item => item.date && item.timeSlot && item.maxDogs !== null);
+
+        try {
+          localStorage.setItem('psiapsi_capacity_cache', JSON.stringify(capacityOverrides));
+        } catch (e) {}
+      }
+
+      // 3. Usługi (jeśli skonfigurowane w arkuszu)
       if (Array.isArray(json.services) && json.services.length > 0) {
         availableServices = json.services;
         try {
@@ -398,7 +420,7 @@ async function fetchBookings() {
         }
       }
 
-      // 3. Grafik (jeśli skonfigurowany w arkuszu)
+      // 4. Grafik (jeśli skonfigurowany w arkuszu)
       if (json.schedule && typeof json.schedule === 'object') {
         scheduleConfig = json.schedule;
         try {
@@ -406,7 +428,7 @@ async function fetchBookings() {
         } catch (e) {}
       }
 
-      // 4. Opinie opiekunów (sekcja pojawia się tylko, gdy są dane)
+      // 5. Opinie opiekunów (sekcja pojawia się tylko, gdy są dane)
       renderTestimonials(json.testimonials);
     }
   } catch (err) {
@@ -716,6 +738,10 @@ function getSlotState(dayDate, dateStr, hour, activeServiceObj) {
     if (bookedWithLoc) slotLocation = bookedWithLoc.location;
   }
 
+  // Ręczny limit z panelu ma pierwszeństwo przed domyślnym limitem zajęć.
+  const capacityOverride = capacityOverrides.find(item => item.date === dateStr && item.timeSlot === hour);
+  if (capacityOverride) slotMaxDogs = capacityOverride.maxDogs;
+
   const has1on1 = matches.some(m => {
     const obj = getServiceByName(m.serviceType);
     if (obj) return obj.is1on1;
@@ -731,6 +757,9 @@ function getSlotState(dayDate, dateStr, hour, activeServiceObj) {
   if (inPast) {
     state = 'past';
     label = 'termin minął';
+  } else if (slotMaxDogs === 0) {
+    state = 'full';
+    label = 'termin zamknięty ręcznie';
   } else if (has1on1) {
     state = 'full';
     label = 'zajęty — zajęcia indywidualne';
@@ -799,6 +828,8 @@ function buildSlot(day, hour, rowIndex, activeServiceObj, otherServiceNames = nu
 
   if (info.state === 'partial') {
     sub += `<span class="s-slot-count">${info.groupCount}/${info.maxDogs}</span>`;
+  } else if (info.state === 'full' && info.maxDogs === 0) {
+    sub += `<span class="s-slot-end">zamknięty</span>`;
   } else if (info.endTime) {
     sub += `<span class="s-slot-end">do ${escapeHtml(info.endTime)}</span>`;
   }

@@ -28,6 +28,9 @@ Projekt łączy lekki frontend HTML/CSS/JS z bezserwerowym backendem opartym na 
   - Po udanej rezerwacji można jednym kliknięciem zapisać dane opiekuna i psa — wyłącznie w pamięci lokalnej przeglądarki (`localStorage`), bez dodatkowej kopii w arkuszu.
   - Przy kolejnym zapisie profile pojawiają się nad formularzem i wypełniają go jednym kliknięciem. Przycisk „Nowy pies” zostawia dane opiekuna, a czyści tylko informacje o psie.
   - Zgody zdrowotne i RODO nigdy nie są zapisywane — trzeba je potwierdzić przy każdej rezerwacji. Profil można usunąć przyciskiem „×”.
+- **Ręczne limity miejsc na konkretny termin**:
+  - W panelu administratora można zmienić limit psów dla wybranej daty i godziny — np. zmniejszyć z 3 do 2, gdy w grupie jest pies wymagający większego dystansu, albo ustawić 0 i zamknąć termin.
+  - Wszędzie indziej obowiązuje domyślny limit z zakładki `Uslugi`; ręczne limity są opcjonalne i nadpisują go tylko punktowo.
 - **Bezobsługowe zarządzanie z telefonu / Arkusza Google**:
   - Zarządzanie **nazwami zajęć, ikonami, opisami i limitami psów** bez edycji plików HTML.
   - Elastyczny **grafik pracy** (godziny domyślne, indywidualne dla dni tygodnia lub konkretnych dat, obsługa dni wolnych / urlopów).
@@ -131,7 +134,23 @@ Zarządzanie godzinami pracy, dniami wolnymi i tym, jakie zajęcia odbywają si�
 
 ---
 
-### 3. Zakładka `Rezerwacje`
+### 3. Zakładka `Miejsca` (opcjonalna)
+Ręczne limity psów dla konkretnych terminów. Zakładka tworzy się sama przy pierwszym zapisie limitu w panelu administratora.
+
+| A: Data | B: Godzina | C: Maks. miejsc | D: Ostatnia zmiana |
+| :--- | :--- | :---: | :--- |
+| **2026-11-07** | **10:00** | **2** | 2026-11-01 12:40 |
+| **2026-11-08** | **11:00** | **0** | 2026-11-01 12:41 |
+
+> **Zasady działania:**
+> - Brak wpisu dla danego terminu = obowiązuje domyślny `Maks psów` z zakładki `Uslugi`.
+> - Wpis nadpisuje limit tylko dla tej jednej daty i godziny.
+> - `0` oznacza termin ręcznie zamknięty — strona pokaże go jako zajęty, a backend odrzuci każdą próbę zapisu.
+> - Limity można wygodnie ustawiać i usuwać w panelu administratora; ręczna edycja arkusza też działa.
+
+---
+
+### 4. Zakładka `Rezerwacje`
 Tutaj automatycznie dopisywane są nowe zgłoszenia klientów.
 
 Kolumny w arkuszu:
@@ -158,7 +177,7 @@ Kolumny w arkuszu:
 
 ---
 
-### 4. Zakładka `Opinie`
+### 5. Zakładka `Opinie`
 Zasila sekcję opinii na stronie głównej. Jeśli zakładka nie istnieje lub nie ma w niej widocznych wpisów, sekcja w ogóle się nie pojawia.
 
 | A: Imię | B: Pies | C: Treść | D: Ocena (1–5) | E: Widoczna (TAK/NIE) |
@@ -175,7 +194,7 @@ Zasila sekcję opinii na stronie głównej. Jeśli zakładka nie istnieje lub ni
 
 ---
 
-### 5. Zakładka `Statystyki`
+### 6. Zakładka `Statystyki`
 Tworzona automatycznie przy pierwszym zdarzeniu. Zapisuje anonimowy lejek rezerwacji (bez cookies i bez danych osobowych).
 
 | A: Data | B: Zdarzenie | C: Szczegóły |
@@ -279,6 +298,7 @@ zakładkę lub dodać do ekranu głównego („Dodaj do ekranu głównego” w p
 | **Wolne** | Dzień bez terminów; strona pokaże wtedy przygaszony dzień bez slotów. |
 | **Wyjątek na datę** | Najwyższy priorytet: urlop, święto albo jednorazowe zajęcia w innej godzinie. |
 | **Zajęcia w tych godzinach** | Pod każdą listą godzin wybierasz, co się w nich odbywa. Brak zaznaczenia = wszystkie zajęcia; chip **„wszystkie zajęcia”** czyści wybór. |
+| **Ręczne limity miejsc** | Wybierasz datę i jedną z godzin dostępnych w grafiku na ten dzień, a potem limit psów inny niż domyślny (0 = termin zamknięty). Wszędzie indziej działa limit z zakładki `Uslugi`. |
 
 Godzinę spoza listy (np. `11:30`) dodasz chipem **„+ inna”**. Panel zapisuje całą zakładkę
 `Grafik` od nowa (kolumny A–C), ale wiersze, których nie rozumie, przepisuje bez zmian.
