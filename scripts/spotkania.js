@@ -82,7 +82,9 @@ let scheduleConfig = {
 let currentMonday        = getMonday(new Date());
 let bookedData           = [];
 let capacityOverrides    = [];
-let selectedService      = 'Spacer socjalizacyjny';
+let selectedService      = availableServices.length ? availableServices[0].name : '';
+let dataReady            = false;
+let initialLoad          = null;
 let selectedGender       = 'pies';
 let selectedDateStr      = '';
 let selectedHour         = '';
@@ -367,6 +369,9 @@ try {
   // Ignoruj błędy localStorage
 }
 
+// Pamięć podręczna mogła pochodzić z wersji strony z inną nazwą zajęć.
+normalizeSelectedService();
+
 // ── Pobieranie danych z Google Apps Script ───────────────────
 
 async function fetchBookings() {
@@ -434,6 +439,9 @@ async function fetchBookings() {
   } catch (err) {
     console.error('Błąd pobierania danych z Arkusza:', err);
   }
+
+  normalizeSelectedService();
+  dataReady = true;
 
   renderServices();
   renderPricing();
@@ -711,6 +719,14 @@ function getServiceByName(name) {
   if (!name) return null;
   const target = String(name).toLowerCase();
   return availableServices.find(s => s.name.toLowerCase() === target) || null;
+}
+
+// Zajęcia zapisane wcześniej (starsza wersja strony, pamięć podręczna) mogły
+// zniknąć z arkusza. Grafik przypisuje godziny do nazw zajęć, więc przy nieistniejącej
+// nazwie żadna godzina nie pasuje i wyszukiwanie kończy się fałszywym „brak terminu”.
+function normalizeSelectedService() {
+  if (getServiceByName(selectedService)) return;
+  if (availableServices.length > 0) selectedService = availableServices[0].name;
 }
 
 // Zwraca pełny stan jednej godziny w danym dniu.
@@ -1047,7 +1063,8 @@ if (studioGrid) {
 // ── Najbliższy wolny termin ─────────────────────────────────
 
 function findNextAvailable(daysAhead = 60) {
-  const activeServiceObj = getServiceByName(selectedService);
+  normalizeSelectedService();
+  const activeServiceObj = getServiceByName(selectedService) || availableServices[0] || null;
   const start = new Date();
   start.setHours(0, 0, 0, 0);
 
@@ -1069,11 +1086,22 @@ function findNextAvailable(daysAhead = 60) {
 }
 
 if (nextFreeBtn) {
-  nextFreeBtn.addEventListener('click', () => {
+  nextFreeBtn.addEventListener('click', async () => {
+    // Kliknięcie potrafi trafić w moment, gdy grafik z arkusza jeszcze się pobiera.
+    // Wtedy godziny nie są jeszcze przypisane do zajęć i szukanie kończyło się
+    // komunikatem o braku terminu. Czekamy na zakończenie pobierania.
+    if (!dataReady && initialLoad) {
+      nextFreeBtn.disabled = true;
+      try { await initialLoad; } catch (e) {}
+      nextFreeBtn.disabled = false;
+    }
+
     const found = findNextAvailable();
 
     if (!found) {
-      alert('Nie znalazłem wolnego terminu w najbliższych tygodniach. Napisz do mnie na kontakt@psiapsi.pl.');
+      alert(availableServices.length === 0
+        ? 'Nie udało się pobrać grafiku. Odśwież stronę i spróbuj ponownie.'
+        : 'Nie znalazłem wolnego terminu w najbliższych tygodniach. Napisz do mnie na kontakt@psiapsi.pl.');
       return;
     }
 
@@ -1917,4 +1945,4 @@ renderServices();
 renderPricing();
 renderCalendar();
 updateLocationOptions();
-fetchBookings();
+initialLoad = fetchBookings();
