@@ -1233,6 +1233,18 @@ function updateMobileView() {
       p.classList.toggle('active', isActive);
       p.setAttribute('aria-pressed', isActive ? 'true' : 'false');
     });
+
+    // Przy przesuwaniu dni palcem aktywna pigułka ma zostać widoczna.
+    const activePill = mobileDaysStrip.querySelector('.s-day-pill.active');
+    if (activePill && mobileDaysStrip.offsetParent !== null) {
+      const pillRect = activePill.getBoundingClientRect();
+      const stripRect = mobileDaysStrip.getBoundingClientRect();
+      if (pillRect.left < stripRect.left) {
+        mobileDaysStrip.scrollLeft += pillRect.left - stripRect.left - 8;
+      } else if (pillRect.right > stripRect.right) {
+        mobileDaysStrip.scrollLeft += pillRect.right - stripRect.right + 8;
+      }
+    }
   }
 
   if (studioGrid) {
@@ -1700,27 +1712,29 @@ if (menuToggle && siteHeader) {
 
 // ── Nawigacja tygodniami ─────────────────────────────────────
 
-if (prevWeekBtn) {
-  prevWeekBtn.addEventListener('click', () => {
-    const todayMon = getMonday(new Date());
-    if (currentMonday > todayMon) {
-      const prev = new Date(currentMonday);
-      prev.setDate(prev.getDate() - 7);
-      currentMonday = getMonday(prev);
-      selectedMobileDayIndex = getInitialMobileDayIndex();
-      renderCalendar();
-    }
-  });
+function goToPreviousWeek() {
+  const todayMon = getMonday(new Date());
+  if (currentMonday <= todayMon) return false;
+
+  const prev = new Date(currentMonday);
+  prev.setDate(prev.getDate() - 7);
+  currentMonday = getMonday(prev);
+  selectedMobileDayIndex = getInitialMobileDayIndex();
+  renderCalendar();
+  return true;
 }
-if (nextWeekBtn) {
-  nextWeekBtn.addEventListener('click', () => {
-    const next = new Date(currentMonday);
-    next.setDate(next.getDate() + 7);
-    currentMonday = getMonday(next);
-    selectedMobileDayIndex = 0;
-    renderCalendar();
-  });
+
+function goToNextWeek() {
+  const next = new Date(currentMonday);
+  next.setDate(next.getDate() + 7);
+  currentMonday = getMonday(next);
+  selectedMobileDayIndex = 0;
+  renderCalendar();
+  return true;
 }
+
+if (prevWeekBtn) prevWeekBtn.addEventListener('click', goToPreviousWeek);
+if (nextWeekBtn) nextWeekBtn.addEventListener('click', goToNextWeek);
 if (todayJumpBtn) {
   todayJumpBtn.addEventListener('click', () => {
     currentMonday = getMonday(new Date());
@@ -1729,39 +1743,149 @@ if (todayJumpBtn) {
   });
 }
 
-// ── Nawigacja dniami (mobile) ────────────────────────────────
+// ── Przesuwanie dni palcem (tylko telefon) ───────────────────
+// Na wąskim ekranie widoczny jest jeden dzień, więc poziomy gest przesuwa
+// kalendarz o dzień — także poza granicę tygodnia. Pionowe przewijanie
+// strony działa bez zmian, a pasek dni ma własne przewijanie w poziomie.
 
-if (mobilePrevDayBtn) {
-  mobilePrevDayBtn.addEventListener('click', () => {
-    if (selectedMobileDayIndex > 0) {
-      selectedMobileDayIndex--;
-      updateMobileView();
-    } else {
-      const todayMon = getMonday(new Date());
-      if (currentMonday > todayMon) {
-        const prev = new Date(currentMonday);
-        prev.setDate(prev.getDate() - 7);
-        currentMonday = getMonday(prev);
-        selectedMobileDayIndex = 6;
-        renderCalendar();
+const mobileSwipeQuery = window.matchMedia('(max-width: 559px)');
+const swipeArea = document.getElementById('step2');
+const SWIPE_MIN_X = 32;
+const SWIPE_MAX_RATIO = 1.1;
+let swipeStartX = 0;
+let swipeStartY = 0;
+let swipeTracking = false;
+let swipeHorizontal = false;
+let swipeDecided = false;
+let ignoreSwipeClickUntil = 0;
+
+function animateDayEntry(direction) {
+  if (!studioGrid || !mobileSwipeQuery.matches) return;
+
+  const cls = direction > 0 ? 'is-day-enter-next' : 'is-day-enter-prev';
+  studioGrid.classList.remove('is-day-enter-next', 'is-day-enter-prev');
+  void studioGrid.offsetWidth;
+  studioGrid.classList.add(cls);
+  studioGrid.addEventListener('animationend', function clear() {
+    studioGrid.classList.remove(cls);
+    studioGrid.removeEventListener('animationend', clear);
+  });
+}
+
+function goToPreviousDay() {
+  if (selectedMobileDayIndex > 0) {
+    selectedMobileDayIndex--;
+    updateMobileView();
+    return true;
+  }
+
+  const todayMon = getMonday(new Date());
+  if (currentMonday <= todayMon) return false;
+
+  const prev = new Date(currentMonday);
+  prev.setDate(prev.getDate() - 7);
+  currentMonday = getMonday(prev);
+  selectedMobileDayIndex = 6;
+  renderCalendar();
+  return true;
+}
+
+function goToNextDay() {
+  if (selectedMobileDayIndex < 6) {
+    selectedMobileDayIndex++;
+    updateMobileView();
+    return true;
+  }
+
+  const next = new Date(currentMonday);
+  next.setDate(next.getDate() + 7);
+  currentMonday = getMonday(next);
+  selectedMobileDayIndex = 0;
+  renderCalendar();
+  return true;
+}
+
+if (swipeArea) {
+  swipeArea.addEventListener('touchstart', (e) => {
+    swipeTracking = false;
+    swipeHorizontal = false;
+    swipeDecided = false;
+    if (!mobileSwipeQuery.matches || e.touches.length !== 1) return;
+
+    swipeTracking = true;
+    swipeStartX = e.touches[0].clientX;
+    swipeStartY = e.touches[0].clientY;
+  }, { passive: true });
+
+  swipeArea.addEventListener('touchmove', (e) => {
+    if (!swipeTracking || e.touches.length !== 1) return;
+
+    const touch = e.touches[0];
+    const dx = touch.clientX - swipeStartX;
+    const dy = touch.clientY - swipeStartY;
+
+    if (!swipeDecided) {
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+
+      if (Math.abs(dx) > Math.abs(dy) * SWIPE_MAX_RATIO) {
+        swipeHorizontal = true;
+        swipeDecided = true;
+      } else {
+        // To gest pionowy — oddajemy przewijanie przeglądarce.
+        swipeTracking = false;
+        return;
       }
     }
-  });
-}
-if (mobileNextDayBtn) {
-  mobileNextDayBtn.addEventListener('click', () => {
-    if (selectedMobileDayIndex < 6) {
-      selectedMobileDayIndex++;
-      updateMobileView();
-    } else {
-      const next = new Date(currentMonday);
-      next.setDate(next.getDate() + 7);
-      currentMonday = getMonday(next);
-      selectedMobileDayIndex = 0;
-      renderCalendar();
+
+    // Poziomym gestem sterujemy sami, żeby przeglądarka nie przerwała go
+    // przewijaniem strony ani gestem wstecz.
+    if (swipeHorizontal && e.cancelable) e.preventDefault();
+  }, { passive: false });
+
+  swipeArea.addEventListener('touchcancel', () => {
+    swipeTracking = false;
+    swipeHorizontal = false;
+    swipeDecided = false;
+  }, { passive: true });
+
+  swipeArea.addEventListener('touchend', (e) => {
+    if (!swipeTracking) return;
+
+    const touch = e.changedTouches && e.changedTouches[0];
+    const dx = touch ? touch.clientX - swipeStartX : 0;
+    const dy = touch ? touch.clientY - swipeStartY : 0;
+
+    swipeTracking = false;
+    swipeHorizontal = false;
+    swipeDecided = false;
+
+    if (!mobileSwipeQuery.matches) return;
+
+    // Tylko wyraźny, poziomy gest — pionowe przewijanie ma zostać przewijaniem.
+    if (Math.abs(dx) < SWIPE_MIN_X) return;
+    if (Math.abs(dx) < Math.abs(dy) * SWIPE_MAX_RATIO) return;
+
+    ignoreSwipeClickUntil = Date.now() + 450;
+
+    if (dx < 0) {
+      if (goToNextDay()) animateDayEntry(1);
+    } else if (goToPreviousDay()) {
+      animateDayEntry(-1);
     }
-  });
+  }, { passive: true });
+
+  // Po geście przeglądarka potrafi jeszcze wysłać click w slot — ignorujemy go.
+  swipeArea.addEventListener('click', (e) => {
+    if (Date.now() >= ignoreSwipeClickUntil) return;
+    e.preventDefault();
+    e.stopPropagation();
+  }, true);
 }
+
+// ── Nawigacja dniami (mobile) ────────────────────────────────
+
+if (mobilePrevDayBtn) mobilePrevDayBtn.addEventListener('click', goToPreviousDay);
+if (mobileNextDayBtn) mobileNextDayBtn.addEventListener('click', goToNextDay);
 
 // ── Inicjalizacja ───────────────────────────────────────────
 // Renderujemy natychmiast z pamięci podręcznej (brak migotania),

@@ -573,6 +573,18 @@ body {
   margin-bottom: 1.1rem;
 }
 
+/* Delikatne wejście kolejnego dnia po przesunięciu palcem (tylko telefon). */
+@keyframes s-day-enter-next {
+  from { opacity: .4; transform: translateX(26px); }
+  to   { opacity: 1;  transform: translateX(0); }
+}
+@keyframes s-day-enter-prev {
+  from { opacity: .4; transform: translateX(-26px); }
+  to   { opacity: 1;  transform: translateX(0); }
+}
+.s-slots-grid.is-day-enter-next { animation: s-day-enter-next .2s ease-out; }
+.s-slots-grid.is-day-enter-prev { animation: s-day-enter-prev .2s ease-out; }
+
 .s-day-col {
   display: none;
   flex-direction: column;
@@ -1942,6 +1954,19 @@ body {
 }
 
 @media (max-width: 559px) {
+  /* Poziomy gest obsługuje JavaScript; pionowe przewijanie zostaje natywne.
+     Pasek dni jest wyłączony, bo sam przewija się w poziomie. */
+  .s-week-nav,
+  .s-mobile-banner,
+  .s-days-strip,
+  .s-slots-grid,
+  .s-legend          { touch-action: pan-y; }
+
+  /* Wszystkie dni mieszczą się w jednym rzędzie — pasek nie musi się
+     przewijać, więc ten sam gest może przesuwać kalendarz o dzień. */
+  .s-days-strip       { gap: .3rem; overflow: visible; padding-bottom: 0; }
+  .s-day-pill         { flex: 1 1 0; min-width: 0; max-width: none; padding: .6rem .15rem; }
+
   .s-main             { padding: 1.5rem 1rem 4rem; }
   .s-page             { gap: 2.25rem; }
 
