@@ -48,7 +48,7 @@ Projekt łączy lekki frontend HTML/CSS/JS z bezserwerowym backendem opartym na 
 - **Opinie opiekunów z arkusza**:
   - Zakładka `Opinie` zasila sekcję na stronie. Sekcja pojawia się tylko wtedy, gdy są w niej widoczne wpisy.
 - **Dostępność i dokumenty**:
-  - Formularz zbiera telefon opiekuna, krótką charakterystykę psa oraz wymagane zgody (zdrowie/szczepienia i RODO).
+  - Formularz zbiera telefon opiekuna, krótką charakterystykę psa oraz wymagane potwierdzenia (zdrowie/szczepienia i zapoznanie się z informacją RODO).
   - W stopce dostępna jest informacja RODO i regulamin usług.
 - **Panel administratora na telefonie**:
   - Grafik, oferta i zapisy bez ręcznego pisania w arkuszu — panel otwiera się pod adresem `…/exec?page=admin` i działa dobrze na telefonie.
@@ -170,7 +170,7 @@ Kolumny w arkuszu:
 13. `Reakcja na inne psy`
 14. `Uwagi o psie`
 15. `Zdrowie i szczepienia (TAK/NIE)`
-16. `Zgoda RODO (TAK/NIE)`
+16. `Potwierdzenie informacji RODO (TAK/NIE)`
 17. `Data utworzenia wpisu`
 18. `Cena indywidualna` (opcjonalna)
 
@@ -245,7 +245,7 @@ Zdarzenia: `usluga_wybrana`, `termin_wybrany`, `formularz_wyslany`, `rezerwacja_
 | Reakcja na inne psy (lista) | tak | kolumna 13 |
 | Ważne informacje o psie | nie | kolumna 14 |
 | Potwierdzenie zdrowia i szczepień | tak | kolumna 15 |
-| Zgoda RODO | tak | kolumna 16 |
+| Potwierdzenie informacji RODO | tak | kolumna 16 |
 
 ---
 
@@ -254,8 +254,10 @@ Zdarzenia: `usluga_wybrana`, `termin_wybrany`, `formularz_wyslany`, `rezerwacja_
 W kodzie pozostawiono świadomie oznaczone miejsca, których nie da się wypełnić bez właściciela serwisu:
 
 1. **Numer telefonu** — w `index.html` występuje w dwóch miejscach: przycisk w nagłówku (linia z `tel:+48500000000`) oraz stopka (link i widoczny numer `+48 500 000 000`).
-2. **Dane administratora danych** — w sekcji RODO (`#rodo`) widnieje placeholder z prośbą o pełną nazwę, adres i NIP.
+2. **Dane administratora danych** — w sekcji RODO (`#rodo`) są pola w nawiasach kwadratowych: nazwa firmy, adres, NIP oraz e-mail i telefon kontaktowy. Uzupełnij je przed publikacją — bez nich klauzula nie spełnia art. 13 RODO.
 3. **Treść RODO i regulaminu** — to wstępne wzory oparte na tym, co i tak jest na stronie. Przed publikacją warto je sprawdzić prawnie.
+3a. **Retencja** — w klauzuli przyjęto 12 miesięcy dla zapisów i 5 lat dla dokumentów rozliczeniowych. Arkusz nie czyści się sam: stare wiersze usuwaj w zakładce `Rezerwacje` albo zmień okres w treści na taki, który faktycznie utrzymasz.
+3b. **Podstawa prawna** — rezerwacja opiera się na art. 6 ust. 1 lit. b (umowa), dlatego checkbox w formularzu to potwierdzenie zapoznania się z informacją, a nie zgoda. Jeśli zmienisz nagłówek kolumny 16 w arkuszu, zachowaj znaczenie `TAK/NIE`.
 4. **Adres profilu na Instagramie** — użyto `https://instagram.com/niko.w.podrozy`.
 5. **Treści w arkuszu** — ceny, czas trwania, „co w cenie” oraz opinie są danymi przykładowymi; realne wartości wpisujesz w arkuszu.
 
