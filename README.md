@@ -172,9 +172,15 @@ Kolumny w arkuszu:
 15. `Zdrowie i szczepienia (TAK/NIE)`
 16. `Zgoda RODO (TAK/NIE)`
 17. `Data utworzenia wpisu`
+18. `Cena indywidualna` (opcjonalna)
+
+> **Cena indywidualna** — pusta komórka oznacza cenę z cennika zajęć. Wpisanie kwoty
+> (np. `90` albo `90,50`) ustawia inną cenę tylko dla tego jednego zapisu. Wartość zmienisz
+> też bezpośrednio w panelu, w zakładce **Zapisy**, przy konkretnym psie.
 
 > **Uwaga przy aktualizacji starszej wersji:** kolumny `Telefon`, `Reakcja na inne psy`, `Uwagi o psie`, `Zdrowie` i `RODO` zostały dodane później.
 > W istniejącym arkuszu wstaw je dokładnie w powyższych miejscach (9, 13–16) i popraw nagłówki — w przeciwnym razie stare wiersze będą przesunięte względem nowych.
+> Kolumnę `Cena indywidualna` (18) dopisze się sama przy pierwszym zapisie ceny z panelu.
 
 ---
 
@@ -313,13 +319,17 @@ unikalne, bo po nich system rozpoznaje, kto jest zapisany na te same zajęcia. G
 
 **Podsumowanie zarobków** — kafelki na górze panelu, widoczne od razu po zalogowaniu:
 **Zarobione** (zajęcia z datą przed dzisiejszą), **Zaplanowane** (dzisiaj i później) oraz **Razem**.
-Kwoty liczone są z kolumny `Cena` w zakładce `Zajęcia`; po rozwinięciu **„Szczegóły wyliczenia”**
-widać liczbę zapisów i stawkę dla każdych zajęć. Zapisy na zajęcia bez ceny nie są zgadywane —
+Kwoty liczone są z kolumny `Cena` w zakładce `Zajęcia`, a cena indywidualna zapisana przy
+konkretnym zapisie ma pierwszeństwo; po rozwinięciu **„Szczegóły wyliczenia”**
+widać liczbę zapisów i stawkę dla każdych zajęć. Gdy w jednych zajęciach są różne ceny,
+panel pokazuje sumę i oznacza ją jako „różne ceny”. Zapisy na zajęcia bez ceny nie są zgadywane —
 panel pokazuje, ile ich jest, i prosi o uzupełnienie cennika. Odwołane zapisy znikają z arkusza,
 więc nie wchodzą do sumy.
 
 **Zapisy** — lista zgłoszeń z wybranego zakresu dat (domyślnie dwa tygodnie): opiekun, pies,
-telefon (klikalny), e-mail i uwagi. Przycisk **Odwołaj zapis** usuwa wiersz z arkusza, próbuje
+telefon (klikalny), e-mail i uwagi. Przy każdym zapisie jest pole **Cena** — domyślnie pokazuje
+stawkę z cennika, a wpisana kwota ustawia cenę tylko dla tego psa (**Zapisz cenę**). Przycisk
+**Wróć do cennika** usuwa indywidualną cenę. Przycisk **Odwołaj zapis** usuwa wiersz z arkusza, próbuje
 usunąć pasujące wydarzenie z Kalendarza Google i zostawia wpis `rezerwacja_odwolana`
 w zakładce `Statystyki`.
 

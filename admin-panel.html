@@ -298,6 +298,22 @@
     .booking-lines b { font-weight: 600; color: var(--text-soft); }
     .booking-lines a { color: var(--brand-dark); text-decoration: none; font-weight: 600; }
     .booking-actions { display: flex; gap: .5rem; margin-top: .7rem; flex-wrap: wrap; }
+    .booking-price {
+      display: flex; align-items: center; gap: .55rem; flex-wrap: wrap;
+      margin-top: .7rem; padding: .55rem .65rem;
+      background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    }
+    .booking-price-label { display: flex; align-items: center; gap: .35rem; font-size: .82rem; font-weight: 600; color: var(--text-soft); }
+    .booking-price-input {
+      width: 6.5rem; padding: .35rem .5rem; font-size: .9rem;
+      border: 1px solid var(--border); border-radius: 8px; background: var(--white); color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+    .booking-price-input:focus { outline: 2px solid var(--brand-soft); border-color: var(--brand); }
+    .booking-price-unit { font-size: .82rem; color: var(--text-soft); }
+    .booking-price-hint { font-size: .76rem; color: var(--text-muted); }
+    .booking-price-hint.is-custom { color: var(--accent); font-weight: 600; }
+    .booking-price-actions { display: flex; gap: .4rem; margin-left: auto; }
     .tag {
       display: inline-block;
       padding: .12rem .45rem;
@@ -1501,7 +1517,23 @@
       return count + ' zapisów';
     }
 
-    // Sumuje wartość zapisów według cen z zakładki Zajęcia.
+    // Cena zapisana przy pojedynczej rezerwacji ma pierwszeństwo przed cennikiem.
+    function bookingCustomPrice(value) {
+      if (value === undefined || value === null || value === '') return null;
+      var num = typeof value === 'number' ? value : parseFloat(String(value).replace(',', '.'));
+      return isFinite(num) && num >= 0 ? num : null;
+    }
+
+    function serviceCataloguePrice(name) {
+      var key = String(name || '').trim().toLowerCase();
+      var list = state.uslugi ? state.uslugi.services : [];
+      for (var i = 0; i < list.length; i++) {
+        if (String(list[i].name || '').trim().toLowerCase() === key) return parsePrice(list[i].price);
+      }
+      return null;
+    }
+
+    // Sumuje wartość zapisów: cena indywidualna, a gdy jej brak — cennik zajęć.
     // Odbyte = data przed dzisiejszą, zaplanowane = dzisiaj i późniejsze.
     function computeEarnings(bookings, services) {
       var prices = {};
@@ -1516,6 +1548,7 @@
         unpriced: 0,
         invalid: 0,
         byService: [],
+        custom: 0,
         total: { count: 0, money: 0 }
       };
       var index = {};
@@ -1531,7 +1564,9 @@
         }
 
         var hasPrice = Object.prototype.hasOwnProperty.call(prices, key);
-        var price = hasPrice ? prices[key] : null;
+        var catalogue = hasPrice ? prices[key] : null;
+        var custom = bookingCustomPrice(booking.customPrice);
+        var price = custom !== null ? custom : catalogue;
         var bucket = String(booking.date) < today ? result.done : result.planned;
         bucket.count += 1;
 
@@ -1539,7 +1574,10 @@
           index[key] = {
             name: booking.service || 'Zajęcia bez nazwy',
             count: 0,
-            price: price,
+            price: null,
+            priced: 0,
+            varied: false,
+            custom: 0,
             money: 0,
             unpriced: 0
           };
@@ -1555,6 +1593,10 @@
         } else {
           bucket.money += price;
           entry.money += price;
+          if (custom !== null) { entry.custom += 1; result.custom += 1; }
+          if (entry.priced === 0) entry.price = price;
+          else if (entry.price !== price) entry.varied = true;
+          entry.priced += 1;
         }
       });
 
@@ -1597,8 +1639,12 @@
         notes.push(bookingsLabel(result.unpriced) + ' bez ceny w cenniku — uzupełnij „Cena” w zakładce Zajęcia.');
       }
 
+      if (result.custom) {
+        notes.push('Ceny indywidualne mają pierwszeństwo przed cennikiem zajęć.');
+      }
+
       if (!notes.length) {
-        notes.push('Wartość z aktualnego cennika zajęć. Anulowane zapisy znikają z arkusza, więc nie są liczone.');
+        notes.push('Wartość z cennika zajęć, z uwzględnieniem cen indywidualnych. Anulowane zapisy znikają z arkusza, więc nie są liczone.');
       }
 
       el.earnNote.textContent = notes.join(' ');
@@ -1622,8 +1668,11 @@
         left.textContent = entry.name + ' · ' + bookingsLabel(entry.count);
 
         var right = document.createElement('b');
-        if (entry.price === null) {
+        if (!entry.priced) {
           right.textContent = 'bez ceny';
+        } else if (entry.varied) {
+          right.textContent = entry.count + ' × różne ceny = ' + formatMoney(entry.money)
+            + (entry.unpriced ? ' (+' + entry.unpriced + ' bez ceny)' : '');
         } else if (entry.unpriced) {
           right.textContent = formatMoney(entry.money) + ' (+' + entry.unpriced + ' bez ceny)';
         } else {
@@ -1704,6 +1753,8 @@
         if (booking.notes) lines.appendChild(line('Uwagi', booking.notes));
         card.appendChild(lines);
 
+        card.appendChild(priceEditor(booking));
+
         var actions = document.createElement('div');
         actions.className = 'booking-actions';
 
@@ -1724,6 +1775,104 @@
 
         card.appendChild(actions);
         el.bookingList.appendChild(card);
+      });
+    }
+
+    function priceEditor(booking) {
+      var custom = bookingCustomPrice(booking.customPrice);
+      var catalogue = serviceCataloguePrice(booking.service);
+
+      var wrap = document.createElement('div');
+      wrap.className = 'booking-price';
+
+      var label = document.createElement('label');
+      label.className = 'booking-price-label';
+      var caption = document.createElement('span');
+      caption.textContent = 'Cena';
+      label.appendChild(caption);
+
+      var input = document.createElement('input');
+      input.type = 'text';
+      input.inputMode = 'decimal';
+      input.className = 'booking-price-input';
+      input.value = custom === null ? '' : String(custom).replace('.', ',');
+      input.placeholder = catalogue === null ? 'wg cennika' : String(catalogue).replace('.', ',');
+      input.setAttribute('aria-label', 'Cena za te zajęcia');
+      label.appendChild(input);
+
+      var unit = document.createElement('span');
+      unit.className = 'booking-price-unit';
+      unit.textContent = 'zł';
+      label.appendChild(unit);
+      wrap.appendChild(label);
+
+      var hint = document.createElement('span');
+      hint.className = 'booking-price-hint';
+      if (custom !== null) {
+        hint.textContent = 'Cena indywidualna';
+        hint.classList.add('is-custom');
+      } else if (catalogue === null) {
+        hint.textContent = 'Brak ceny w cenniku — wpisz kwotę';
+      } else {
+        hint.textContent = 'z cennika: ' + formatMoney(catalogue);
+      }
+      wrap.appendChild(hint);
+
+      var buttons = document.createElement('div');
+      buttons.className = 'booking-price-actions';
+
+      var save = document.createElement('button');
+      save.type = 'button';
+      save.className = 'btn secondary small';
+      save.textContent = 'Zapisz cenę';
+      save.addEventListener('click', function () {
+        saveBookingPrice(booking, input.value, input, save);
+      });
+      buttons.appendChild(save);
+
+      if (custom !== null) {
+        var reset = document.createElement('button');
+        reset.type = 'button';
+        reset.className = 'btn ghost small';
+        reset.textContent = 'Wróć do cennika';
+        reset.addEventListener('click', function () {
+          input.value = '';
+          saveBookingPrice(booking, '', input, reset);
+        });
+        buttons.appendChild(reset);
+      }
+
+      input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          save.click();
+        }
+      });
+
+      wrap.appendChild(buttons);
+      return wrap;
+    }
+
+    function saveBookingPrice(booking, price, input, button) {
+      var previous = button.disabled;
+      button.disabled = true;
+
+      call('saveBookingPrice', {
+        row: booking.row,
+        date: booking.date,
+        time: booking.time,
+        price: String(price || '').trim()
+      }).then(function (res) {
+        booking.customPrice = res.price === null || res.price === undefined ? null : res.price;
+        renderBookings();
+        loadEarnings();
+        toast(res.price === null
+          ? 'Przywrócono cenę z cennika.'
+          : 'Zapisano cenę ' + formatMoney(res.price) + ' za te zajęcia.');
+      }).catch(function (err) {
+        button.disabled = previous;
+        if (input) input.focus();
+        toast(err.message, true);
       });
     }
 

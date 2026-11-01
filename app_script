@@ -219,7 +219,8 @@ function doPost(e) {
       data.dogNotes,                                         // 14 Uwagi o psie
       data.healthConfirm ? 'TAK' : 'NIE',                     // 15 Zdrowie i szczepienia
       data.rodoConsent ? 'TAK' : 'NIE',                       // 16 Zgoda RODO
-      Utilities.formatDate(new Date(), tz, "yyyy-MM-dd HH:mm:ss") // 17 Data utworzenia wpisu
+      Utilities.formatDate(new Date(), tz, "yyyy-MM-dd HH:mm:ss"), // 17 Data utworzenia wpisu
+      ''                                                      // 18 Cena indywidualna (puste = cennik)
     ]);
 
     // Tworzenie wydarzenia w Kalendarzu Google
@@ -917,6 +918,7 @@ function adminApi(req) {
       case 'saveUslugi':    return adminSaveUslugi_(spreadsheet, req.payload || {});
       case 'rezerwacje':    return adminGetRezerwacje_(spreadsheet, req.payload || {});
       case 'cancelBooking': return adminCancelBooking_(spreadsheet, req.payload || {});
+      case 'saveBookingPrice': return adminSaveBookingPrice_(spreadsheet, req.payload || {});
       default:              return { status: 'error', message: 'Nieznana akcja: ' + req.action };
     }
   } catch (err) {
@@ -1299,6 +1301,7 @@ function adminGetRezerwacje_(spreadsheet, payload) {
       sociability: String(row[12] || '').trim(),
       notes: String(row[13] || '').trim(),
       health: String(row[14] || '').trim(),
+      customPrice: adminParsePrice_(row[17]),
       created: row[16] ? Utilities.formatDate(new Date(row[16]), tz, 'yyyy-MM-dd HH:mm') : ''
     });
   }
@@ -1357,6 +1360,77 @@ function adminCancelBooking_(spreadsheet, payload) {
 
     return { status: 'success', row: rowNumber, calendarRemoved: calendarRemoved };
   });
+}
+
+// Cena pojedynczego zapisu. Pusta wartość przywraca cenę z cennika zajęć.
+function adminSaveBookingPrice_(spreadsheet, payload) {
+  var rowNumber = parseInt(payload.row, 10);
+  if (!rowNumber || rowNumber < 2) {
+    return { status: 'error', code: 'validation', message: 'Nieprawidłowy wiersz rezerwacji.' };
+  }
+
+  var raw = payload.price;
+  var text = (raw === undefined || raw === null) ? '' : String(raw).trim();
+  var price = null;
+
+  if (text !== '') {
+    var normalized = text.toLowerCase()
+      .replace(/\u00a0/g, ' ')
+      .replace(/zł|pln/g, '')
+      .replace(/\s+/g, '')
+      .replace(',', '.');
+    var match = normalized.match(/^\d+(?:\.\d{1,2})?$/);
+    if (!match) {
+      return { status: 'error', code: 'validation', message: 'Cena musi być liczbą, np. 90 lub 90,50 zł.' };
+    }
+    price = Math.round(parseFloat(match[0]) * 100) / 100;
+    if (!isFinite(price) || price < 0 || price > 100000) {
+      return { status: 'error', code: 'validation', message: 'Cena musi być liczbą od 0 do 100000 zł.' };
+    }
+  }
+
+  return adminWithLock_(function () {
+    var sheet = spreadsheet.getSheetByName('Rezerwacje') || spreadsheet.getActiveSheet();
+    var tz = spreadsheet.getSpreadsheetTimeZone() || 'Europe/Warsaw';
+
+    if (rowNumber > sheet.getLastRow()) {
+      return { status: 'error', message: 'Ten zapis już nie istnieje — odśwież listę.' };
+    }
+
+    var values = sheet.getRange(rowNumber, 1, 1, 17).getValues()[0];
+    var date = formatSheetDate(values[0], tz);
+    var time = formatSheetTime(values[2], tz);
+
+    // Jak przy odwoływaniu — chronimy się przed zapisem do przesuniętego wiersza.
+    if (payload.date && date !== String(payload.date).trim()) {
+      return { status: 'error', message: 'Lista się zmieniła — odśwież zapisy i spróbuj ponownie.' };
+    }
+    if (payload.time && time !== normalizeTime(String(payload.time).trim())) {
+      return { status: 'error', message: 'Lista się zmieniła — odśwież zapisy i spróbuj ponownie.' };
+    }
+
+    sheet.getRange(rowNumber, 18).setValue(price === null ? '' : price);
+
+    // Nagłówek dopisujemy tylko wtedy, gdy kolumna jest zupełnie pusta.
+    if (sheet.getMaxColumns() >= 18 && String(sheet.getRange(1, 18).getValue() || '').trim() === '') {
+      sheet.getRange(1, 18).setValue('Cena indywidualna');
+    }
+
+    return { status: 'success', row: rowNumber, price: price };
+  });
+}
+
+// Czyta cenę z arkusza; toleruje liczby i tekst typu „90 zł” czy „90,50”.
+function adminParsePrice_(value) {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value === 'number') return isFinite(value) && value >= 0 ? value : null;
+
+  var text = String(value).replace(/\u00a0/g, ' ').trim();
+  if (!text) return null;
+  var match = text.replace(/\s+/g, '').replace(',', '.').match(/\d+(?:\.\d+)?/);
+  if (!match) return null;
+  var parsed = parseFloat(match[0]);
+  return isFinite(parsed) && parsed >= 0 ? parsed : null;
 }
 
 // Szuka w Kalendarzu wydarzenia tej rezerwacji (data + godzina + imię psa).
