@@ -573,17 +573,17 @@ body {
   margin-bottom: 1.1rem;
 }
 
-/* Delikatne wejście kolejnego dnia po przesunięciu palcem (tylko telefon). */
-@keyframes s-day-enter-next {
+/* Delikatne wejście nowego zakresu po przesunięciu palcem (tylko telefon). */
+@keyframes s-view-enter-next {
   from { opacity: .4; transform: translateX(26px); }
   to   { opacity: 1;  transform: translateX(0); }
 }
-@keyframes s-day-enter-prev {
+@keyframes s-view-enter-prev {
   from { opacity: .4; transform: translateX(-26px); }
   to   { opacity: 1;  transform: translateX(0); }
 }
-.s-slots-grid.is-day-enter-next { animation: s-day-enter-next .2s ease-out; }
-.s-slots-grid.is-day-enter-prev { animation: s-day-enter-prev .2s ease-out; }
+.s-slots-grid.is-view-enter-next { animation: s-view-enter-next .2s ease-out; }
+.s-slots-grid.is-view-enter-prev { animation: s-view-enter-prev .2s ease-out; }
 
 .s-day-col {
   display: none;

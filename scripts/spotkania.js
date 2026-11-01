@@ -1743,10 +1743,10 @@ if (todayJumpBtn) {
   });
 }
 
-// ── Przesuwanie dni palcem (tylko telefon) ───────────────────
-// Na wąskim ekranie widoczny jest jeden dzień, więc poziomy gest przesuwa
-// kalendarz o dzień — także poza granicę tygodnia. Pionowe przewijanie
-// strony działa bez zmian, a pasek dni ma własne przewijanie w poziomie.
+// ── Przesuwanie kalendarza palcem (tylko telefon) ────────────
+// Jeden gest przesuwa kalendarz o tygodnie — długość gestu decyduje,
+// jak daleko. Dzięki temu jednym ruchem można przejść przez większą
+// część miesiąca, a kolejne gesty nie mają górnego limitu.
 
 const mobileSwipeQuery = window.matchMedia('(max-width: 559px)');
 const swipeArea = document.getElementById('step2');
@@ -1759,17 +1759,36 @@ let swipeHorizontal = false;
 let swipeDecided = false;
 let ignoreSwipeClickUntil = 0;
 
-function animateDayEntry(direction) {
+function animateViewEntry(direction) {
   if (!studioGrid || !mobileSwipeQuery.matches) return;
 
-  const cls = direction > 0 ? 'is-day-enter-next' : 'is-day-enter-prev';
-  studioGrid.classList.remove('is-day-enter-next', 'is-day-enter-prev');
+  const cls = direction > 0 ? 'is-view-enter-next' : 'is-view-enter-prev';
+  studioGrid.classList.remove('is-view-enter-next', 'is-view-enter-prev');
   void studioGrid.offsetWidth;
   studioGrid.classList.add(cls);
   studioGrid.addEventListener('animationend', function clear() {
     studioGrid.classList.remove(cls);
     studioGrid.removeEventListener('animationend', clear);
   });
+}
+
+function moveCalendarByWeeks(weeks) {
+  const target = new Date(currentMonday);
+  target.setDate(target.getDate() + weeks * 7);
+  let targetMonday = getMonday(target);
+
+  // W tył zatrzymujemy się na bieżącym tygodniu, ale duży gest nie
+  // powinien „nic nie robić” — po prostu dojeżdża do tej granicy.
+  if (weeks < 0) {
+    const todayMonday = getMonday(new Date());
+    if (targetMonday < todayMonday) targetMonday = todayMonday;
+  }
+
+  if (targetMonday.getTime() === currentMonday.getTime()) return false;
+
+  currentMonday = targetMonday;
+  renderCalendar();
+  return true;
 }
 
 function goToPreviousDay() {
@@ -1867,10 +1886,13 @@ if (swipeArea) {
 
     ignoreSwipeClickUntil = Date.now() + 450;
 
+    // Im dłuższy gest, tym więcej tygodni — około 80 px na tydzień.
+    const weeks = Math.max(1, Math.min(8, Math.round(Math.abs(dx) / 80)));
+
     if (dx < 0) {
-      if (goToNextDay()) animateDayEntry(1);
-    } else if (goToPreviousDay()) {
-      animateDayEntry(-1);
+      if (moveCalendarByWeeks(weeks)) animateViewEntry(1);
+    } else if (moveCalendarByWeeks(-weeks)) {
+      animateViewEntry(-1);
     }
   }, { passive: true });
 
