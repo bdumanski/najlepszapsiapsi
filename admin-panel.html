@@ -152,6 +152,23 @@
 
     /* ── Podsumowanie zarobków ────────────────────────────── */
     .earnings { margin-bottom: 1rem; }
+    .earnings-head { display: flex; align-items: center; gap: .5rem; margin-bottom: .6rem; }
+    .earnings-head > span {
+      font-size: .62rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .07em; color: var(--text-muted);
+    }
+    .earnings-month {
+      flex: 1 1 auto;
+      min-width: 0;
+      padding: .42rem .6rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+      color: var(--text);
+      font-size: .82rem;
+      font-weight: 600;
+    }
+    .earnings-month:focus { outline: 2px solid var(--brand-soft); border-color: var(--brand); }
     .earnings-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
@@ -331,6 +348,11 @@
     .booking-price-hint { font-size: .76rem; color: var(--text-muted); }
     .booking-price-hint.is-custom { color: var(--accent); font-weight: 600; }
     .booking-price-actions { display: flex; gap: .4rem; margin-left: auto; }
+    .booking-paid {
+      display: flex; align-items: center; gap: .45rem;
+      margin-top: .6rem; font-size: .82rem; font-weight: 600; color: var(--text-soft);
+    }
+    .booking-paid input { width: 1.05rem; height: 1.05rem; accent-color: var(--brand); }
     .tag {
       display: inline-block;
       padding: .12rem .45rem;
@@ -421,6 +443,10 @@
     <main class="wrap">
       <!-- ── Podsumowanie zarobków ─────────────────────────── -->
       <section class="card earnings" id="earnings" aria-label="Podsumowanie zarobków">
+        <div class="earnings-head">
+          <span>Okres</span>
+          <select class="earnings-month" id="earningsMonth" aria-label="Okres podsumowania"></select>
+        </div>
         <div class="earnings-grid">
           <div class="earnings-item">
             <span class="earnings-label">Zarobione</span>
@@ -431,6 +457,11 @@
             <span class="earnings-label">Zaplanowane</span>
             <strong class="earnings-value" id="earnPlanned">—</strong>
             <span class="earnings-meta" id="earnPlannedMeta">przyszłe zapisy</span>
+          </div>
+          <div class="earnings-item">
+            <span class="earnings-label">Opłacone</span>
+            <strong class="earnings-value" id="earnPaid">—</strong>
+            <span class="earnings-meta" id="earnPaidMeta">do zapłaty —</span>
           </div>
           <div class="earnings-item">
             <span class="earnings-label">Koszty</span>
@@ -621,6 +652,7 @@
       bookings: [],
       earningsBookings: [],
       costs: [],
+      earningsMonth: '',
       exceptionDraft: [],
       exceptionServicesDraft: [],
       grafikDirty: false,
@@ -641,8 +673,9 @@
        'capacityHoursHint',
        'serviceList', 'uslugiHint', 'addService', 'fromDate', 'toDate', 'refreshBookings',
        'bookingsSummary', 'bookingList', 'earnDone', 'earnDoneMeta', 'earnPlanned',
-       'earnPlannedMeta', 'earnCosts', 'earnCostsMeta', 'earnNet', 'earnNetMeta',
-       'earnNote', 'earnBreakdown', 'costDate', 'costLabel', 'costAmount', 'addCost',
+       'earnPlannedMeta', 'earnPaid', 'earnPaidMeta', 'earnCosts', 'earnCostsMeta',
+       'earnNet', 'earnNetMeta', 'earnNote', 'earnBreakdown', 'earningsMonth',
+       'costDate', 'costLabel', 'costAmount', 'addCost',
        'costError', 'costSummary', 'costList'].forEach(function (id) { el[id] = $(id); });
 
       el.loginForm.addEventListener('submit', onLogin);
@@ -657,6 +690,10 @@
       el.addCost.addEventListener('click', onAddCost);
       el.costLabel.addEventListener('keydown', onCostKeydown);
       el.costAmount.addEventListener('keydown', onCostKeydown);
+      el.earningsMonth.addEventListener('change', function () {
+        state.earningsMonth = String(el.earningsMonth.value || '');
+        renderEarnings();
+      });
 
       Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (tab) {
         tab.addEventListener('click', function () { switchTab(tab.dataset.tab); });
@@ -667,6 +704,7 @@
       el.toDate.value = iso(addDays(today, 14));
       el.capacityDate.value = iso(today);
       el.costDate.value = iso(today);
+      state.earningsMonth = iso(today).slice(0, 7);
 
       if (!hasRunner()) {
         showLogin();
@@ -1606,6 +1644,7 @@
       var result = {
         done: { count: 0, money: 0 },
         planned: { count: 0, money: 0 },
+        paid: { count: 0, money: 0 },
         unpriced: 0,
         invalid: 0,
         byService: [],
@@ -1654,6 +1693,7 @@
         } else {
           bucket.money += price;
           entry.money += price;
+          if (booking.paid) { result.paid.count += 1; result.paid.money += price; }
           if (custom !== null) { entry.custom += 1; result.custom += 1; }
           if (entry.priced === 0) entry.price = price;
           else if (entry.price !== price) entry.varied = true;
@@ -1674,20 +1714,89 @@
       return result;
     }
 
+    // Nazwa miesiąca do listy okresów: "2026-10" → "październik 2026"
+    function monthLabel(month) {
+      var parts = String(month || '').split('-');
+      if (parts.length !== 2) return String(month || '');
+      var date = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, 1);
+      try {
+        return new Intl.DateTimeFormat('pl-PL', { month: 'long', year: 'numeric' }).format(date);
+      } catch (e) {
+        return month;
+      }
+    }
+
+    // Miesiące z zapisów i kosztów + zawsze bieżący, od najnowszego.
+    function buildMonthOptions() {
+      if (!el.earningsMonth) return;
+
+      var months = {};
+      (state.earningsBookings || []).forEach(function (booking) {
+        var key = String(booking.date || '').slice(0, 7);
+        if (/^\d{4}-\d{2}$/.test(key)) months[key] = true;
+      });
+      (state.costs || []).forEach(function (cost) {
+        var key = String(cost.date || '').slice(0, 7);
+        if (/^\d{4}-\d{2}$/.test(key)) months[key] = true;
+      });
+
+      var current = iso(new Date()).slice(0, 7);
+      months[current] = true;
+
+      var keys = Object.keys(months).sort().reverse();
+      // Pusty wybór to „Cały czas” — tylko nieistniejący miesiąc wracamy na bieżący.
+      if (state.earningsMonth && keys.indexOf(state.earningsMonth) === -1) {
+        state.earningsMonth = current;
+      }
+
+      el.earningsMonth.innerHTML = '';
+
+      var all = document.createElement('option');
+      all.value = '';
+      all.textContent = 'Cały czas';
+      el.earningsMonth.appendChild(all);
+
+      keys.forEach(function (key) {
+        var option = document.createElement('option');
+        option.value = key;
+        option.textContent = monthLabel(key);
+        el.earningsMonth.appendChild(option);
+      });
+
+      el.earningsMonth.value = state.earningsMonth;
+    }
+
     function renderEarnings() {
       if (!el.earnDone) return;
 
-      var result = computeEarnings(state.earningsBookings, state.uslugi ? state.uslugi.services : []);
+      buildMonthOptions();
+
+      var month = state.earningsMonth;
+      var periodBookings = month
+        ? (state.earningsBookings || []).filter(function (booking) {
+          return String(booking.date || '').slice(0, 7) === month;
+        })
+        : state.earningsBookings;
+      var periodCosts = (state.costs || []).filter(function (cost) {
+        return !month || String(cost.date || '').slice(0, 7) === month;
+      });
+
+      var result = computeEarnings(periodBookings, state.uslugi ? state.uslugi.services : []);
+      var costs = costsSum(periodCosts);
+      var net = Math.round((result.total.money - costs) * 100) / 100;
+      var due = Math.round((result.total.money - result.paid.money) * 100) / 100;
 
       el.earnDone.textContent = formatMoney(result.done.money);
       el.earnDoneMeta.textContent = bookingsLabel(result.done.count);
       el.earnPlanned.textContent = formatMoney(result.planned.money);
       el.earnPlannedMeta.textContent = bookingsLabel(result.planned.count);
-      var costs = costsTotal();
-      var net = Math.round((result.total.money - costs) * 100) / 100;
+      el.earnPaid.textContent = formatMoney(result.paid.money);
+      el.earnPaidMeta.textContent = !result.total.count
+        ? 'brak zapisów'
+        : (due > 0 ? 'do zapłaty ' + formatMoney(due) : 'wszystko opłacone');
 
       el.earnCosts.textContent = formatMoney(costs);
-      el.earnCostsMeta.textContent = state.costs.length ? costsLabel(state.costs.length) : 'brak kosztów';
+      el.earnCostsMeta.textContent = periodCosts.length ? costsLabel(periodCosts.length) : 'brak kosztów';
       el.earnNet.textContent = formatMoney(net);
       el.earnNetMeta.textContent = 'zapisy − koszty';
 
@@ -1698,7 +1807,9 @@
       }
 
       if (!result.total.count && !result.invalid) {
-        notes.push('Brak zapisów w arkuszu — nie ma czego liczyć.');
+        notes.push(month
+          ? 'W okresie „' + monthLabel(month) + '” nie ma żadnych zapisów — wybierz inny okres nad kafelkami.'
+          : 'Brak zapisów w arkuszu — nie ma czego liczyć.');
       } else if (result.unpriced && result.unpriced === result.total.count) {
         notes.push('Żadne z zapisanych zajęć nie ma jeszcze ceny w zakładce Zajęcia, więc kwota to 0 zł. Uzupełnij „Cena” — po zapisaniu przeliczę wszystko od razu.');
       } else if (result.unpriced) {
@@ -1713,6 +1824,10 @@
         notes.push('Koszty ' + formatMoney(costs) + ' obniżają sumę zapisów (' + formatMoney(result.total.money) + '). Edytujesz je w zakładce Koszty.');
       }
 
+      if (result.total.count && result.paid.count < result.total.count) {
+        notes.push('Zaznacz „Opłacone” przy zapisie w zakładce Zapisy — kafelek pokaże, ile faktycznie wpłynęło.');
+      }
+
       if (!notes.length) {
         notes.push('Wartość z cennika zajęć, z uwzględnieniem cen indywidualnych. Anulowane zapisy znikają z arkusza, więc nie są liczone.');
       }
@@ -1722,7 +1837,7 @@
 
       el.earnBreakdown.innerHTML = '';
 
-      if (!result.byService.length && !state.costs.length) {
+      if (!result.byService.length && !periodCosts.length) {
         var empty = document.createElement('span');
         empty.className = 'muted';
         empty.textContent = 'Brak zapisów w arkuszu.';
@@ -1756,9 +1871,16 @@
 
       appendEarnLine('Suma zapisów · ' + bookingsLabel(result.total.count), formatMoney(result.total.money));
 
-      if (state.costs.length) {
-        appendEarnLine('Koszty · ' + costsLabel(state.costs.length), '−' + formatMoney(costs), 'is-head');
-        state.costs.forEach(function (cost) {
+      if (result.paid.count) {
+        appendEarnLine('Opłacone · ' + bookingsLabel(result.paid.count), formatMoney(result.paid.money));
+      }
+      if (due > 0 && result.total.count) {
+        appendEarnLine('Do zapłaty', formatMoney(due));
+      }
+
+      if (periodCosts.length) {
+        appendEarnLine('Koszty · ' + costsLabel(periodCosts.length), '−' + formatMoney(costs), 'is-head');
+        periodCosts.forEach(function (cost) {
           appendEarnLine(cost.label + (cost.date ? ' · ' + shortDate(cost.date) : ''), '−' + formatMoney(cost.amount));
         });
       }
@@ -1797,13 +1919,17 @@
       });
     }
 
-    function costsTotal() {
+    function costsSum(list) {
       var sum = 0;
-      (state.costs || []).forEach(function (cost) {
+      (list || []).forEach(function (cost) {
         var value = Number(cost.amount);
         if (isFinite(value)) sum += value;
       });
       return Math.round(sum * 100) / 100;
+    }
+
+    function costsTotal() {
+      return costsSum(state.costs);
     }
 
     function costsLabel(count) {
@@ -1994,6 +2120,7 @@
         card.appendChild(lines);
 
         card.appendChild(priceEditor(booking));
+        card.appendChild(paidToggle(booking));
 
         var actions = document.createElement('div');
         actions.className = 'booking-actions';
@@ -2091,6 +2218,52 @@
 
       wrap.appendChild(buttons);
       return wrap;
+    }
+
+    // Znacznik „Opłacone” — zapisuje TAK do kolumny 19 arkusza.
+    function paidToggle(booking) {
+      var wrap = document.createElement('label');
+      wrap.className = 'booking-paid';
+
+      var box = document.createElement('input');
+      box.type = 'checkbox';
+      box.checked = !!booking.paid;
+      box.setAttribute('aria-label', 'Oznacz zapis jako opłacony');
+
+      var text = document.createElement('span');
+      text.textContent = booking.paid ? 'Opłacone' : 'Do zapłaty';
+
+      box.addEventListener('change', function () {
+        saveBookingPaid(booking, box.checked, box, text);
+      });
+
+      wrap.appendChild(box);
+      wrap.appendChild(text);
+      return wrap;
+    }
+
+    function saveBookingPaid(booking, paid, box, label) {
+      box.disabled = true;
+      call('saveBookingPaid', {
+        row: booking.row,
+        date: booking.date,
+        time: booking.time,
+        paid: !!paid
+      }).then(function (res) {
+        booking.paid = !!res.paid;
+        (state.earningsBookings || []).forEach(function (entry) {
+          if (entry.row === booking.row) entry.paid = booking.paid;
+        });
+        box.checked = booking.paid;
+        if (label) label.textContent = booking.paid ? 'Opłacone' : 'Do zapłaty';
+        renderEarnings();
+        toast(booking.paid ? 'Zapis oznaczony jako opłacony.' : 'Zapis wrócił do „do zapłaty”.');
+      }).catch(function (err) {
+        box.checked = !box.checked;
+        toast(err.message, true);
+      }).then(function () {
+        box.disabled = false;
+      });
     }
 
     function saveBookingPrice(booking, price, input, button) {

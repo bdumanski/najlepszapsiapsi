@@ -919,6 +919,7 @@ function adminApi(req) {
       case 'rezerwacje':    return adminGetRezerwacje_(spreadsheet, req.payload || {});
       case 'cancelBooking': return adminCancelBooking_(spreadsheet, req.payload || {});
       case 'saveBookingPrice': return adminSaveBookingPrice_(spreadsheet, req.payload || {});
+      case 'saveBookingPaid': return adminSaveBookingPaid_(spreadsheet, req.payload || {});
       case 'koszty':        return adminGetKoszty_(spreadsheet);
       case 'addKoszt':      return adminAddKoszt_(spreadsheet, req.payload || {});
       case 'deleteKoszt':   return adminDeleteKoszt_(spreadsheet, req.payload || {});
@@ -1467,6 +1468,7 @@ function adminGetRezerwacje_(spreadsheet, payload) {
       notes: String(row[13] || '').trim(),
       health: String(row[14] || '').trim(),
       customPrice: adminParsePrice_(row[17]),
+      paid: adminParsePaid_(row[18]),
       created: row[16] ? Utilities.formatDate(new Date(row[16]), tz, 'yyyy-MM-dd HH:mm') : ''
     });
   }
@@ -1582,6 +1584,57 @@ function adminSaveBookingPrice_(spreadsheet, payload) {
     }
 
     return { status: 'success', row: rowNumber, price: price };
+  });
+}
+
+// Znacznik „Opłacone” (kolumna 19). Puste = do zapłaty.
+function adminParsePaid_(value) {
+  if (value === true) return true;
+  var text = String(value === undefined || value === null ? '' : value).trim().toLowerCase();
+  if (!text) return false;
+  return ['tak', 'yes', 'y', '1', 'x', 'true', 'opłacone', 'oplacone', '✓'].indexOf(text) !== -1;
+}
+
+// Zapis znacznika „Opłacone” — kolumna 19 obok ceny indywidualnej.
+function adminSaveBookingPaid_(spreadsheet, payload) {
+  var rowNumber = parseInt(payload.row, 10);
+  if (!rowNumber || rowNumber < 2) {
+    return { status: 'error', code: 'validation', message: 'Nieprawidłowy wiersz rezerwacji.' };
+  }
+
+  var paid = payload.paid === true
+    || payload.paid === 1
+    || String(payload.paid).trim().toLowerCase() === 'true'
+    || String(payload.paid).trim() === '1';
+
+  return adminWithLock_(function () {
+    var sheet = spreadsheet.getSheetByName('Rezerwacje') || spreadsheet.getActiveSheet();
+    var tz = spreadsheet.getSpreadsheetTimeZone() || 'Europe/Warsaw';
+
+    if (rowNumber > sheet.getLastRow()) {
+      return { status: 'error', message: 'Ten zapis już nie istnieje — odśwież listę.' };
+    }
+
+    var values = sheet.getRange(rowNumber, 1, 1, 17).getValues()[0];
+    var date = formatSheetDate(values[0], tz);
+    var time = formatSheetTime(values[2], tz);
+
+    // Jak przy cenie — nie zapisujemy do wiersza, który przesunął się po odświeżeniu.
+    if (payload.date && date !== String(payload.date).trim()) {
+      return { status: 'error', message: 'Lista się zmieniła — odśwież zapisy i spróbuj ponownie.' };
+    }
+    if (payload.time && time !== normalizeTime(String(payload.time).trim())) {
+      return { status: 'error', message: 'Lista się zmieniła — odśwież zapisy i spróbuj ponownie.' };
+    }
+
+    sheet.getRange(rowNumber, 19).setValue(paid ? 'TAK' : '');
+
+    // Nagłówek dopisujemy tylko wtedy, gdy kolumna jest zupełnie pusta.
+    if (sheet.getMaxColumns() >= 19 && String(sheet.getRange(1, 19).getValue() || '').trim() === '') {
+      sheet.getRange(1, 19).setValue('Opłacone (TAK/NIE)');
+    }
+
+    return { status: 'success', row: rowNumber, paid: paid };
   });
 }
 

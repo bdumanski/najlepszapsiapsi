@@ -173,10 +173,14 @@ Kolumny w arkuszu:
 16. `Potwierdzenie informacji RODO (TAK/NIE)`
 17. `Data utworzenia wpisu`
 18. `Cena indywidualna` (opcjonalna)
+19. `Opłacone (TAK/NIE)` — puste albo `NIE` oznacza „do zapłaty”; nagłówek dopisze panel przy pierwszym oznaczeniu
 
 > **Cena indywidualna** — pusta komórka oznacza cenę z cennika zajęć. Wpisanie kwoty
 > (np. `90` albo `90,50`) ustawia inną cenę tylko dla tego jednego zapisu. Wartość zmienisz
 > też bezpośrednio w panelu, w zakładce **Zapisy**, przy konkretnym psie.
+
+> **Opłacone** — pole przy każdym zapisie w zakładce **Zapisy**. Zaznaczenie wpisuje `TAK`
+> do kolumny 19 i od razu przelicza kafelek **Opłacone** oraz kwotę „do zapłaty”.
 
 > **Uwaga przy aktualizacji starszej wersji:** kolumny `Telefon`, `Reakcja na inne psy`, `Uwagi o psie`, `Zdrowie` i `RODO` zostały dodane później.
 > W istniejącym arkuszu wstaw je dokładnie w powyższych miejscach (9, 13–16) i popraw nagłówki — w przeciwnym razie stare wiersze będą przesunięte względem nowych.
@@ -320,7 +324,13 @@ unikalne, bo po nich system rozpoznaje, kto jest zapisany na te same zajęcia. G
 `Uslugi` nie ma, panel pokaże ofertę zapasową, a pierwszy zapis ją utworzy.
 
 **Podsumowanie zarobków** — kafelki na górze panelu, widoczne od razu po zalogowaniu:
-**Zarobione** (zajęcia z datą przed dzisiejszą), **Zaplanowane** (dzisiaj i później), **Koszty** oraz **Na czysto** (zapisy minus koszty).
+**Zarobione** (zajęcia z datą przed dzisiejszą), **Zaplanowane** (dzisiaj i później), **Opłacone**
+(z kwotą „do zapłaty” pod spodem), **Koszty** oraz **Na czysto** (zapisy minus koszty).
+
+**Widok miesięczny** — nad kafelkami wybierasz okres: „Cały czas” albo konkretny miesiąc.
+Kafelki, koszty i szczegóły wyliczenia liczą się wtedy tylko dla tego miesiąca, więc pytanie
+„ile zarobiłem w październiku” ma jedną odpowiedź bez filtrowania arkusza. Lista miesięcy
+powstaje z danych w arkuszu plus zawsze zawiera bieżący miesiąc.
 Kwoty liczone są z kolumny `Cena` w zakładce `Zajęcia`, a cena indywidualna zapisana przy
 konkretnym zapisie ma pierwszeństwo; po rozwinięciu **„Szczegóły wyliczenia”**
 widać liczbę zapisów i stawkę dla każdych zajęć. Gdy w jednych zajęciach są różne ceny,
