@@ -320,13 +320,19 @@ unikalne, bo po nich system rozpoznaje, kto jest zapisany na te same zajęcia. G
 `Uslugi` nie ma, panel pokaże ofertę zapasową, a pierwszy zapis ją utworzy.
 
 **Podsumowanie zarobków** — kafelki na górze panelu, widoczne od razu po zalogowaniu:
-**Zarobione** (zajęcia z datą przed dzisiejszą), **Zaplanowane** (dzisiaj i później) oraz **Razem**.
+**Zarobione** (zajęcia z datą przed dzisiejszą), **Zaplanowane** (dzisiaj i później), **Koszty** oraz **Na czysto** (zapisy minus koszty).
 Kwoty liczone są z kolumny `Cena` w zakładce `Zajęcia`, a cena indywidualna zapisana przy
 konkretnym zapisie ma pierwszeństwo; po rozwinięciu **„Szczegóły wyliczenia”**
 widać liczbę zapisów i stawkę dla każdych zajęć. Gdy w jednych zajęciach są różne ceny,
 panel pokazuje sumę i oznacza ją jako „różne ceny”. Zapisy na zajęcia bez ceny nie są zgadywane —
 panel pokazuje, ile ich jest, i prosi o uzupełnienie cennika. Odwołane zapisy znikają z arkusza,
 więc nie wchodzą do sumy.
+
+**Koszty** — zakładka `Koszty` w panelu, w arkuszu ta sama nazwa (kolumny `ID`, `Data`, `Za co`,
+`Kwota`). Wpisujesz datę, opis (np. „wynajem salki”) i kwotę, a pozycję usuwasz przyciskiem
+**Usuń**. Suma kosztów pomniejsza kwotę **Na czysto** i jest rozpisana w „Szczegółach wyliczenia”.
+Panel dopisuje i usuwa pojedyncze wiersze, więc ręczne wpisy w arkuszu też się liczą —
+bez wpisanego ID panel usunie taki wiersz po numerze.
 
 **Zapisy** — lista zgłoszeń z wybranego zakresu dat (domyślnie dwa tygodnie): opiekun, pies,
 telefon (klikalny), e-mail i uwagi. Przy każdym zapisie jest pole **Cena** — domyślnie pokazuje

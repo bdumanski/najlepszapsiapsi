@@ -919,12 +919,177 @@ function adminApi(req) {
       case 'rezerwacje':    return adminGetRezerwacje_(spreadsheet, req.payload || {});
       case 'cancelBooking': return adminCancelBooking_(spreadsheet, req.payload || {});
       case 'saveBookingPrice': return adminSaveBookingPrice_(spreadsheet, req.payload || {});
+      case 'koszty':        return adminGetKoszty_(spreadsheet);
+      case 'addKoszt':      return adminAddKoszt_(spreadsheet, req.payload || {});
+      case 'deleteKoszt':   return adminDeleteKoszt_(spreadsheet, req.payload || {});
       default:              return { status: 'error', message: 'Nieznana akcja: ' + req.action };
     }
   } catch (err) {
     Logger.log('adminApi: ' + err);
     return { status: 'error', message: 'Błąd serwera: ' + err.toString() };
   }
+}
+
+// ── Koszty prowadzenia biznesu ─────────────────────────────────────────
+// Zakładka "Koszty": ID | Data | Za co | Kwota.
+// Koszty są wpisywane ręcznie w panelu i obniżają kwotę "Na czysto"
+// w podsumowaniu zarobków. Arkusz jest jedynym źródłem prawdy — panel
+// tylko dopisuje i usuwa wiersze, nie nadpisuje całej zakładki.
+
+var KOSZTY_SHEET = 'Koszty';
+var KOSZTY_HEADERS = ['ID', 'Data', 'Za co', 'Kwota'];
+
+function kosztySheet_(spreadsheet, create) {
+  var sheet = spreadsheet.getSheetByName(KOSZTY_SHEET);
+  if (!sheet) {
+    if (!create) return null;
+    sheet = spreadsheet.insertSheet(KOSZTY_SHEET);
+  }
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(KOSZTY_HEADERS);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+// "50", "50,50 zł", "1 200,00" → 50 / 50.5 / 1200; cokolwiek innego → null
+function kosztyAmount_(value) {
+  var raw = String(value === undefined || value === null ? '' : value)
+    .replace(/\u00a0/g, ' ')
+    .replace(/[^0-9.,-]/g, '')
+    .replace(/\s+/g, '')
+    .replace(',', '.');
+  var num = parseFloat(raw);
+  if (!isFinite(num) || num <= 0) return null;
+  num = Math.round(num * 100) / 100;
+  return num > 100000 ? null : num;
+}
+
+// Data z komórki arkusza → "RRRR-MM-DD" (albo "", gdy nie da się odczytać).
+function kosztyDate_(value, tz) {
+  if (value === undefined || value === null || value === '') return '';
+
+  if (Object.prototype.toString.call(value) === '[object Date]') {
+    if (isNaN(value.getTime())) return '';
+    return Utilities.formatDate(value, tz, 'yyyy-MM-dd');
+  }
+
+  var raw = String(value).trim();
+  var iso = raw.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return iso[1] + '-' + iso[2] + '-' + iso[3];
+
+  var pl = raw.match(/(\d{1,2})[.\/](\d{1,2})[.\/](\d{4})/);
+  if (pl) {
+    return pl[3] + '-' + ('0' + pl[2]).slice(-2) + '-' + ('0' + pl[1]).slice(-2);
+  }
+  return '';
+}
+
+function adminGetKoszty_(spreadsheet) {
+  var sheet = kosztySheet_(spreadsheet, true);
+  var tz = spreadsheet.getSpreadsheetTimeZone() || 'Europe/Warsaw';
+  var data = sheet.getDataRange().getValues();
+  var result = { status: 'success', costs: [], total: 0 };
+
+  for (var i = 1; i < data.length; i++) {
+    var id = String(data[i][0] === undefined || data[i][0] === null ? '' : data[i][0]).trim();
+    var label = String(data[i][2] === undefined || data[i][2] === null ? '' : data[i][2]).trim();
+    var amount = kosztyAmount_(data[i][3]);
+
+    // Pusty albo niepełny wiersz pomijamy — suma nie może zależeć od śmieci.
+    if (!label || amount === null) continue;
+
+    result.costs.push({
+      id: id || 'row-' + (i + 1),
+      date: kosztyDate_(data[i][1], tz),
+      label: label,
+      amount: amount
+    });
+    result.total += amount;
+  }
+
+  result.costs.sort(function (a, b) {
+    if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+    return a.label < b.label ? -1 : 1;
+  });
+  result.total = Math.round(result.total * 100) / 100;
+  return result;
+}
+
+function adminAddKoszt_(spreadsheet, payload) {
+  var label = String(payload.label === undefined || payload.label === null ? '' : payload.label)
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (label.length < 2) {
+    return { status: 'error', message: 'Wpisz, za co był koszt — np. wynajem salki.' };
+  }
+  if (label.length > 120) label = label.slice(0, 120);
+
+  var amount = kosztyAmount_(payload.amount);
+  if (amount === null) {
+    return { status: 'error', message: 'Kwota musi być liczbą większą od zera, np. 50.' };
+  }
+
+  var tz = spreadsheet.getSpreadsheetTimeZone() || 'Europe/Warsaw';
+  var date = Object.prototype.toString.call(payload.date) === '[object Date]'
+    ? kosztyDate_(payload.date, tz)
+    : String(payload.date === undefined || payload.date === null ? '' : payload.date).trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    date = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+  }
+
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+  } catch (err) {
+    return { status: 'error', message: 'Arkusz był zajęty. Spróbuj ponownie.' };
+  }
+
+  try {
+    var sheet = kosztySheet_(spreadsheet, true);
+    var id = Utilities.getUuid();
+    sheet.appendRow([id, date, label, amount]);
+  } finally {
+    lock.releaseLock();
+  }
+
+  var result = adminGetKoszty_(spreadsheet);
+  return { status: 'success', costs: result.costs, total: result.total };
+}
+
+function adminDeleteKoszt_(spreadsheet, payload) {
+  var id = String(payload.id === undefined || payload.id === null ? '' : payload.id).trim();
+  if (!id) return { status: 'error', message: 'Brak identyfikatora kosztu.' };
+
+  var sheet = kosztySheet_(spreadsheet, false);
+  if (!sheet) return { status: 'error', message: 'Nie ma jeszcze żadnych kosztów.' };
+
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+  } catch (err) {
+    return { status: 'error', message: 'Arkusz był zajęty. Spróbuj ponownie.' };
+  }
+
+  try {
+    var data = sheet.getDataRange().getValues();
+    var legacyRow = id.match(/^row-(\d+)$/);
+
+    for (var i = 1; i < data.length; i++) {
+      var rowId = String(data[i][0] === undefined || data[i][0] === null ? '' : data[i][0]).trim();
+      var matches = rowId === id || (legacyRow && parseInt(legacyRow[1], 10) === i + 1);
+      if (matches) {
+        sheet.deleteRow(i + 1);
+        var result = adminGetKoszty_(spreadsheet);
+        return { status: 'success', costs: result.costs, total: result.total };
+      }
+    }
+  } finally {
+    lock.releaseLock();
+  }
+
+  return { status: 'error', message: 'Nie znalazłem tego kosztu — odśwież panel.' };
 }
 
 // ── Grafik ─────────────────────────────────────────────────────────────

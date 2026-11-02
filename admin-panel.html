@@ -193,6 +193,23 @@
     .earnings-list { margin-top: .45rem; display: flex; flex-direction: column; gap: .25rem; font-size: .76rem; }
     .earnings-line { display: flex; justify-content: space-between; gap: .75rem; color: var(--text-soft); }
     .earnings-line b { font-weight: 600; white-space: nowrap; }
+    .earnings-line.is-head {
+      margin-top: .5rem; padding-top: .45rem;
+      border-top: 1px solid var(--border);
+      color: var(--text); font-weight: 700;
+    }
+    .earnings-line.is-total {
+      margin-top: .3rem; padding-top: .4rem;
+      border-top: 1px solid var(--border);
+      font-size: .8rem; font-weight: 700; color: var(--text);
+    }
+
+    /* ── Koszty ───────────────────────────────────────────── */
+    .cost-row { display: flex; align-items: center; gap: .6rem; }
+    .cost-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: .12rem; }
+    .cost-label { font-size: .84rem; font-weight: 600; overflow-wrap: anywhere; }
+    .cost-meta { font-size: .72rem; color: var(--text-muted); }
+    .cost-amount { font-size: .86rem; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
     .btn {
       border: 1px solid transparent;
@@ -398,6 +415,7 @@
       <button class="tab is-active" data-tab="grafik" type="button" role="tab" aria-selected="true">Grafik</button>
       <button class="tab" data-tab="uslugi" type="button" role="tab" aria-selected="false">Zajęcia</button>
       <button class="tab" data-tab="zapisy" type="button" role="tab" aria-selected="false">Zapisy</button>
+      <button class="tab" data-tab="koszty" type="button" role="tab" aria-selected="false">Koszty</button>
     </nav>
 
     <main class="wrap">
@@ -414,10 +432,15 @@
             <strong class="earnings-value" id="earnPlanned">—</strong>
             <span class="earnings-meta" id="earnPlannedMeta">przyszłe zapisy</span>
           </div>
+          <div class="earnings-item">
+            <span class="earnings-label">Koszty</span>
+            <strong class="earnings-value" id="earnCosts">—</strong>
+            <span class="earnings-meta" id="earnCostsMeta">brak kosztów</span>
+          </div>
           <div class="earnings-item is-total">
-            <span class="earnings-label">Razem</span>
-            <strong class="earnings-value is-brand" id="earnTotal">—</strong>
-            <span class="earnings-meta" id="earnTotalMeta">wszystkie zapisy</span>
+            <span class="earnings-label">Na czysto</span>
+            <strong class="earnings-value is-brand" id="earnNet">—</strong>
+            <span class="earnings-meta" id="earnNetMeta">zapisy − koszty</span>
           </div>
         </div>
         <p class="earnings-note" id="earnNote"></p>
@@ -534,6 +557,35 @@
         <p id="bookingsSummary" class="muted" style="margin-top:.8rem"></p>
         <div id="bookingList" class="stack"></div>
       </section>
+
+      <!-- ── Koszty ─────────────────────────────────────────── -->
+      <section data-panel="koszty" hidden>
+        <p class="lead">
+          Wpisz poniesione koszty prowadzenia biznesu — np. wynajem salki za 50 zł.
+          Suma kosztów obniża kwotę „Na czysto” w podsumowaniu u góry panelu.
+        </p>
+        <div class="card">
+          <div class="grid-2">
+            <label class="field">
+              <span>Data</span>
+              <input type="date" id="costDate">
+            </label>
+            <label class="field">
+              <span>Ile (zł)</span>
+              <input type="text" id="costAmount" inputmode="decimal" placeholder="np. 50" autocomplete="off">
+            </label>
+          </div>
+          <label class="field" style="margin-top:.6rem">
+            <span>Za co</span>
+            <input type="text" id="costLabel" maxlength="120" placeholder="np. wynajem salki" autocomplete="off">
+          </label>
+          <p class="hint" style="margin-top:.5rem">Koszt trafia do zakładki <code>Koszty</code> w arkuszu — możesz go tam też poprawić ręcznie.</p>
+          <button class="btn primary" id="addCost" type="button" style="margin-top:.7rem">Dodaj koszt</button>
+          <p id="costError" class="error" role="alert"></p>
+        </div>
+        <p id="costSummary" class="muted" style="margin-top:.9rem"></p>
+        <div id="costList" class="stack"></div>
+      </section>
     </main>
   </div>
 
@@ -568,6 +620,7 @@
       uslugi: null,
       bookings: [],
       earningsBookings: [],
+      costs: [],
       exceptionDraft: [],
       exceptionServicesDraft: [],
       grafikDirty: false,
@@ -588,8 +641,9 @@
        'capacityHoursHint',
        'serviceList', 'uslugiHint', 'addService', 'fromDate', 'toDate', 'refreshBookings',
        'bookingsSummary', 'bookingList', 'earnDone', 'earnDoneMeta', 'earnPlanned',
-       'earnPlannedMeta', 'earnTotal', 'earnTotalMeta', 'earnNote',
-       'earnBreakdown'].forEach(function (id) { el[id] = $(id); });
+       'earnPlannedMeta', 'earnCosts', 'earnCostsMeta', 'earnNet', 'earnNetMeta',
+       'earnNote', 'earnBreakdown', 'costDate', 'costLabel', 'costAmount', 'addCost',
+       'costError', 'costSummary', 'costList'].forEach(function (id) { el[id] = $(id); });
 
       el.loginForm.addEventListener('submit', onLogin);
       el.logout.addEventListener('click', onLogout);
@@ -600,6 +654,9 @@
       el.capacityDate.addEventListener('change', renderCapacityTimeOptions);
       el.addService.addEventListener('click', onAddService);
       el.refreshBookings.addEventListener('click', onRefreshBookings);
+      el.addCost.addEventListener('click', onAddCost);
+      el.costLabel.addEventListener('keydown', onCostKeydown);
+      el.costAmount.addEventListener('keydown', onCostKeydown);
 
       Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (tab) {
         tab.addEventListener('click', function () { switchTab(tab.dataset.tab); });
@@ -609,6 +666,7 @@
       el.fromDate.value = iso(today);
       el.toDate.value = iso(addDays(today, 14));
       el.capacityDate.value = iso(today);
+      el.costDate.value = iso(today);
 
       if (!hasRunner()) {
         showLogin();
@@ -702,6 +760,7 @@
       el.app.hidden = false;
       loadGrafik();
       loadUslugi();
+      loadCosts();
       loadEarnings();
     }
 
@@ -733,6 +792,7 @@
       state.uslugi = null;
       state.bookings = [];
       state.earningsBookings = [];
+      state.costs = [];
       state.grafikDirty = false;
       state.uslugiDirty = false;
       updateSavebar();
@@ -753,6 +813,7 @@
       });
       updateSavebar();
       if (tab === 'zapisy') loadBookings();
+      if (tab === 'koszty') loadCosts();
     }
 
     function updateSavebar() {
@@ -1622,8 +1683,13 @@
       el.earnDoneMeta.textContent = bookingsLabel(result.done.count);
       el.earnPlanned.textContent = formatMoney(result.planned.money);
       el.earnPlannedMeta.textContent = bookingsLabel(result.planned.count);
-      el.earnTotal.textContent = formatMoney(result.total.money);
-      el.earnTotalMeta.textContent = bookingsLabel(result.total.count);
+      var costs = costsTotal();
+      var net = Math.round((result.total.money - costs) * 100) / 100;
+
+      el.earnCosts.textContent = formatMoney(costs);
+      el.earnCostsMeta.textContent = state.costs.length ? costsLabel(state.costs.length) : 'brak kosztów';
+      el.earnNet.textContent = formatMoney(net);
+      el.earnNetMeta.textContent = 'zapisy − koszty';
 
       var notes = [];
 
@@ -1643,6 +1709,10 @@
         notes.push('Ceny indywidualne mają pierwszeństwo przed cennikiem zajęć.');
       }
 
+      if (costs > 0) {
+        notes.push('Koszty ' + formatMoney(costs) + ' obniżają sumę zapisów (' + formatMoney(result.total.money) + '). Edytujesz je w zakładce Koszty.');
+      }
+
       if (!notes.length) {
         notes.push('Wartość z cennika zajęć, z uwzględnieniem cen indywidualnych. Anulowane zapisy znikają z arkusza, więc nie są liczone.');
       }
@@ -1652,7 +1722,7 @@
 
       el.earnBreakdown.innerHTML = '';
 
-      if (!result.byService.length) {
+      if (!result.byService.length && !state.costs.length) {
         var empty = document.createElement('span');
         empty.className = 'muted';
         empty.textContent = 'Brak zapisów w arkuszu.';
@@ -1682,6 +1752,176 @@
         row.appendChild(left);
         row.appendChild(right);
         el.earnBreakdown.appendChild(row);
+      });
+
+      appendEarnLine('Suma zapisów · ' + bookingsLabel(result.total.count), formatMoney(result.total.money));
+
+      if (state.costs.length) {
+        appendEarnLine('Koszty · ' + costsLabel(state.costs.length), '−' + formatMoney(costs), 'is-head');
+        state.costs.forEach(function (cost) {
+          appendEarnLine(cost.label + (cost.date ? ' · ' + shortDate(cost.date) : ''), '−' + formatMoney(cost.amount));
+        });
+      }
+
+      appendEarnLine('Na czysto', formatMoney(net), 'is-total');
+    }
+
+    function appendEarnLine(leftText, rightText, extraClass) {
+      var row = document.createElement('div');
+      row.className = 'earnings-line' + (extraClass ? ' ' + extraClass : '');
+      var left = document.createElement('span');
+      left.textContent = leftText;
+      var right = document.createElement('b');
+      right.textContent = rightText;
+      row.appendChild(left);
+      row.appendChild(right);
+      el.earnBreakdown.appendChild(row);
+    }
+
+    // "2026-11-02" → "02.11" (data kosztu w szczegółach wyliczenia)
+    function shortDate(dateStr) {
+      var parts = String(dateStr || '').split('-');
+      return parts.length === 3 ? parts[2] + '.' + parts[1] : String(dateStr || '');
+    }
+
+    /* ── Koszty ──────────────────────────────────────────── */
+
+    function loadCosts() {
+      return call('koszty', {}).then(function (res) {
+        state.costs = res.costs || [];
+        renderCosts();
+        renderEarnings();
+      }).catch(function (err) {
+        if (!el.costError) return;
+        el.costError.textContent = 'Nie udało się pobrać kosztów: ' + err.message;
+      });
+    }
+
+    function costsTotal() {
+      var sum = 0;
+      (state.costs || []).forEach(function (cost) {
+        var value = Number(cost.amount);
+        if (isFinite(value)) sum += value;
+      });
+      return Math.round(sum * 100) / 100;
+    }
+
+    function costsLabel(count) {
+      if (count === 1) return '1 koszt';
+      var rest = count % 10;
+      var tens = count % 100;
+      if (rest >= 2 && rest <= 4 && (tens < 12 || tens > 14)) return count + ' koszty';
+      return count + ' kosztów';
+    }
+
+    function renderCosts() {
+      if (!el.costList) return;
+      el.costList.innerHTML = '';
+
+      el.costSummary.textContent = state.costs.length
+        ? costsLabel(state.costs.length) + ' · razem ' + formatMoney(costsTotal())
+        : 'Brak wpisanych kosztów.';
+
+      if (!state.costs.length) {
+        var empty = document.createElement('p');
+        empty.className = 'muted';
+        empty.textContent = 'Dodaj pierwszy koszt powyżej — np. wynajem salki 50 zł.';
+        el.costList.appendChild(empty);
+        return;
+      }
+
+      state.costs.forEach(function (cost) {
+        var row = document.createElement('div');
+        row.className = 'card cost-row';
+
+        var main = document.createElement('div');
+        main.className = 'cost-main';
+
+        var label = document.createElement('span');
+        label.className = 'cost-label';
+        label.textContent = cost.label;
+
+        var meta = document.createElement('span');
+        meta.className = 'cost-meta';
+        meta.textContent = cost.date ? formatDayPL(cost.date) : 'bez daty';
+
+        main.appendChild(label);
+        main.appendChild(meta);
+
+        var amount = document.createElement('span');
+        amount.className = 'cost-amount';
+        amount.textContent = '−' + formatMoney(cost.amount);
+
+        var remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'btn ghost small';
+        remove.textContent = 'Usuń';
+        remove.setAttribute('aria-label', 'Usuń koszt: ' + cost.label);
+        remove.addEventListener('click', function () { removeCost(cost, remove); });
+
+        row.appendChild(main);
+        row.appendChild(amount);
+        row.appendChild(remove);
+        el.costList.appendChild(row);
+      });
+    }
+
+    function onCostKeydown(e) {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      onAddCost(e);
+    }
+
+    function onAddCost(e) {
+      if (e) e.preventDefault();
+
+      var label = String(el.costLabel.value || '').replace(/\s+/g, ' ').trim();
+      var amountRaw = String(el.costAmount.value || '').trim();
+      el.costError.textContent = '';
+
+      if (label.length < 2) {
+        el.costError.textContent = 'Wpisz, za co był koszt — np. wynajem salki.';
+        el.costLabel.focus();
+        return;
+      }
+
+      // Minus odrzucamy, zanim parsePrice zamieni "-50" na 50.
+      var amount = amountRaw.indexOf('-') === -1 ? parsePrice(amountRaw) : null;
+      if (amount === null || amount <= 0) {
+        el.costError.textContent = 'Wpisz kwotę większą od zera, np. 50.';
+        el.costAmount.focus();
+        return;
+      }
+
+      el.addCost.disabled = true;
+      call('addKoszt', {
+        date: String(el.costDate.value || ''),
+        label: label,
+        amount: amount
+      }).then(function (res) {
+        state.costs = res.costs || state.costs;
+        el.costLabel.value = '';
+        el.costAmount.value = '';
+        renderCosts();
+        renderEarnings();
+        toast('Koszt zapisany.');
+      }).catch(function (err) {
+        el.costError.textContent = err.message;
+      }).then(function () {
+        el.addCost.disabled = false;
+      });
+    }
+
+    function removeCost(cost, button) {
+      if (button) button.disabled = true;
+      call('deleteKoszt', { id: cost.id }).then(function (res) {
+        state.costs = res.costs || [];
+        renderCosts();
+        renderEarnings();
+        toast('Koszt usunięty.');
+      }).catch(function (err) {
+        if (button) button.disabled = false;
+        toast(err.message, true);
       });
     }
 
